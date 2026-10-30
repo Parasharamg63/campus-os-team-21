@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   PlusCircle, Search, Clock, CheckCircle2, AlertCircle, FileText,
   Upload, Star, MessageSquare, ArrowLeft, Copy, Check, ExternalLink,
-  ChevronRight, RefreshCw, Send, ShieldAlert, Sparkles, MapPin, Phone, User
+  ChevronRight, RefreshCw, Send, ShieldAlert, Sparkles, MapPin, Phone, User,
+  Edit2, Trash2, X
 } from 'lucide-react';
 import {
   apiGetTickets, apiCreateTicket, apiTrackTicket, apiAcknowledgeTicket,
-  apiGetIssueTypes, apiSubmitFeedback, apiGetFeedbacks
+  apiGetIssueTypes, apiSubmitFeedback, apiGetFeedbacks, apiUpdateTicket, apiDeleteTicket
 } from '../api';
 
 export default function StudentView({ currentUser, onOpenNotifications, onSelectRole }) {
@@ -44,6 +45,19 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
   const [feedbackCategory, setFeedbackCategory] = useState('Classroom Infrastructure');
   const [feedbackComment, setFeedbackComment] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
+  // Edit Complaint State (Spec Option 3: PATCH/DELETE /tickets/{id} for reporter while open)
+  const [editingTicket, setEditingTicket] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    description: '',
+    location: '',
+    issue_type_id: '',
+  });
+  const [editPhoto, setEditPhoto] = useState(null);
+  const [editPhotoPreview, setEditPhotoPreview] = useState(null);
+  const [removeExistingPhoto, setRemoveExistingPhoto] = useState(false);
+  const [submittingEdit, setSubmittingEdit] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -218,6 +232,112 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
     navigator.clipboard.writeText(text);
     setCopiedId(true);
     setTimeout(() => setCopiedId(false), 2000);
+  };
+
+  // Open Edit Complaint Modal (Spec Option 3: PATCH /tickets/{id})
+  const handleOpenEdit = (ticket) => {
+    setEditingTicket(ticket);
+    setEditFormData({
+      title: ticket.title || '',
+      description: ticket.description || '',
+      location: ticket.location || '',
+      issue_type_id: ticket.issue_type_id || (issueTypes[0]?.issue_type_id || ''),
+    });
+    setEditPhoto(null);
+    setEditPhotoPreview(ticket.photo?.url || null);
+    setRemoveExistingPhoto(false);
+    setErrorMsg('');
+    setSuccessMsg('');
+  };
+
+  const handleCloseEdit = () => {
+    setEditingTicket(null);
+    setEditPhoto(null);
+    setEditPhotoPreview(null);
+    setRemoveExistingPhoto(false);
+  };
+
+  const handleEditPhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMsg('Image file size must be less than 5 MB.');
+        return;
+      }
+      setEditPhoto(file);
+      setEditPhotoPreview(URL.createObjectURL(file));
+      setRemoveExistingPhoto(false);
+    }
+  };
+
+  const handleRemoveEditPhoto = () => {
+    setEditPhoto(null);
+    setEditPhotoPreview(null);
+    setRemoveExistingPhoto(true);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editFormData.title.trim()) {
+      setErrorMsg('Title must be between 3 and 120 characters.');
+      return;
+    }
+    if (!editFormData.description.trim()) {
+      setErrorMsg('Description is required.');
+      return;
+    }
+
+    try {
+      setSubmittingEdit(true);
+      setErrorMsg('');
+
+      const submission = new FormData();
+      submission.append('title', editFormData.title.trim());
+      submission.append('description', editFormData.description.trim());
+      submission.append('location', editFormData.location.trim());
+      submission.append('issue_type_id', editFormData.issue_type_id);
+
+      if (removeExistingPhoto) {
+        submission.append('remove_photo', 'true');
+      } else if (editPhoto) {
+        submission.append('photo', editPhoto);
+      }
+
+      const updated = await apiUpdateTicket(editingTicket.ticket_id, submission);
+      setSuccessMsg(`Complaint ${editingTicket.ticket_id} updated successfully!`);
+
+      // Update state
+      setTickets(prev => prev.map(t => t.ticket_id === updated.ticket_id ? updated : t));
+      if (trackedTicket && trackedTicket.ticket_id === updated.ticket_id) {
+        setTrackedTicket(updated);
+      }
+      handleCloseEdit();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to update complaint.');
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+
+  // Delete Complaint (Spec Option 3: DELETE /tickets/{id})
+  const handleDeleteTicket = async (ticket_id) => {
+    if (!window.confirm(`Are you sure you want to delete complaint ${ticket_id}? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      setErrorMsg('');
+      await apiDeleteTicket(ticket_id);
+      setSuccessMsg(`Complaint ${ticket_id} deleted successfully.`);
+      setTickets(prev => prev.filter(t => t.ticket_id !== ticket_id));
+      if (trackedTicket && trackedTicket.ticket_id === ticket_id) {
+        setTrackedTicket(null);
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to delete complaint.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -428,6 +548,27 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
                           <Search size={14} />
                           <span>Track Status</span>
                         </button>
+
+                        {t.status === 'open' && (
+                          <>
+                            <button
+                              className="btn btn-outline btn-sm edit-btn"
+                              onClick={() => handleOpenEdit(t)}
+                              title="Edit Complaint"
+                            >
+                              <Edit2 size={14} />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              className="btn btn-danger-outline btn-sm delete-btn"
+                              onClick={() => handleDeleteTicket(t.ticket_id)}
+                              title="Delete Complaint"
+                            >
+                              <Trash2 size={14} />
+                              <span>Delete</span>
+                            </button>
+                          </>
+                        )}
 
                         {t.status === 'resolved' && (
                           <button
@@ -729,6 +870,28 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
                   </div>
                 </div>
 
+                {/* Reporter Edit/Delete Actions for Open Tickets (Spec Option 3) */}
+                {trackedTicket.status === 'open' && (
+                  <div className="tracked-reporter-actions" style={{ display: 'flex', gap: 10, margin: '14px 0' }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => handleOpenEdit(trackedTicket)}
+                    >
+                      <Edit2 size={15} />
+                      <span>Edit Complaint Details</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger-outline btn-sm"
+                      onClick={() => handleDeleteTicket(trackedTicket.ticket_id)}
+                    >
+                      <Trash2 size={15} />
+                      <span>Delete Complaint</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Photo Preview if attached */}
                 {trackedTicket.photo?.url && (
                   <div className="photo-attachment-card">
@@ -940,6 +1103,144 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
           <span className="team-track-badge">Team 21 · Track 4</span>
         </div>
       </footer>
+
+      {/* EDIT COMPLAINT MODAL (Spec Option 3: PATCH /tickets/{id} for reporter while open) */}
+      {editingTicket && (
+        <div className="modal-backdrop" onClick={handleCloseEdit}>
+          <div className="modal-card modal-lg edit-complaint-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span className="badge badge-open" style={{ marginBottom: 6, display: 'inline-block' }}>Option 3: Edit Complaint</span>
+                <h3>Modify Complaint #{editingTicket.ticket_id}</h3>
+              </div>
+              <button type="button" className="modal-close-btn" onClick={handleCloseEdit}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="edit-complaint-form">
+              <div className="form-group">
+                <label className="form-label">Category / Issue Type</label>
+                <select
+                  className="form-select"
+                  value={editFormData.issue_type_id}
+                  onChange={e => setEditFormData({ ...editFormData, issue_type_id: e.target.value })}
+                  required
+                >
+                  {issueTypes.map(it => (
+                    <option key={it.issue_type_id} value={it.issue_type_id}>
+                      {it.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Complaint Title (3 - 120 chars)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editFormData.title}
+                  onChange={e => setEditFormData({ ...editFormData, title: e.target.value })}
+                  maxLength={120}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Specific Location (Room, Block, Floor)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editFormData.location}
+                  onChange={e => setEditFormData({ ...editFormData, location: e.target.value })}
+                  placeholder="e.g. Block B, 2nd Floor, Room 204 or Boys Hostel 2"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Description of Problem</label>
+                <textarea
+                  className="form-textarea"
+                  rows={4}
+                  value={editFormData.description}
+                  onChange={e => setEditFormData({ ...editFormData, description: e.target.value })}
+                  maxLength={2000}
+                  required
+                />
+                <span className="char-count">{editFormData.description.length} / 2000 chars</span>
+              </div>
+
+              {/* Photo section */}
+              <div className="form-group">
+                <label className="form-label">Attached Photo (Edit / Replace / Remove)</label>
+                {editPhotoPreview ? (
+                  <div className="edit-photo-preview-wrap">
+                    <img src={editPhotoPreview} alt="Complaint preview" className="edit-photo-thumb" />
+                    <div className="photo-actions-flex">
+                      <label className="btn btn-secondary btn-sm" htmlFor="edit-modal-photo-file">
+                        <Upload size={14} />
+                        <span>Change Photo</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="btn btn-danger-outline btn-sm"
+                        onClick={handleRemoveEditPhoto}
+                      >
+                        <Trash2 size={14} />
+                        <span>Remove Photo</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="file-dropzone" onClick={() => document.getElementById('edit-modal-photo-file').click()}>
+                    <div className="dropzone-inner">
+                      <Upload size={24} className="upload-icon" />
+                      <p>Click to attach a defect photo</p>
+                      <span className="upload-sub-text">Optional, max 5 MB (JPG, PNG, WebP)</span>
+                    </div>
+                  </div>
+                )}
+                <input
+                  id="edit-modal-photo-file"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={handleEditPhotoChange}
+                />
+              </div>
+
+              <div className="modal-actions-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleCloseEdit}
+                  disabled={submittingEdit}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={submittingEdit}
+                >
+                  {submittingEdit ? (
+                    <>
+                      <RefreshCw size={16} className="spin-icon" />
+                      <span>Saving Changes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

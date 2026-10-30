@@ -234,7 +234,7 @@ exports.updateTicket = async (req, res) => {
       return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only ticket reporter or admin can edit this ticket' } });
     }
 
-    const { title, description, issue_type_id, remove_photo } = req.body;
+    const { title, description, location, issue_type_id, remove_photo } = req.body;
 
     if (issue_type_id) {
       const issueType = await IssueType.findOne({ issue_type_id });
@@ -246,6 +246,7 @@ exports.updateTicket = async (req, res) => {
 
     if (title) ticket.title = title.trim();
     if (description) ticket.description = description.trim();
+    if (location) ticket.location = location.trim();
 
     if (remove_photo === 'true' || remove_photo === true) {
       ticket.photo = undefined;
@@ -259,6 +260,15 @@ exports.updateTicket = async (req, res) => {
         url: `${baseUrl}/uploads/${req.file.filename}`,
       };
     }
+
+    ticket.timeline.push({
+      status: 'Updated',
+      note: 'Complaint details edited by student',
+      actor_name: req.user ? req.user.name : ticket.reported_by_name,
+      actor_role: req.user ? req.user.role : 'student',
+      timestamp: new Date(),
+      image_url: ticket.photo ? ticket.photo.url : undefined,
+    });
 
     await ticket.save();
     return res.status(200).json(ticket);

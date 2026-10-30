@@ -43,6 +43,18 @@ exports.getIssueTypeById = async (req, res) => {
 // POST /api/v1/fixit/issue-types
 exports.createIssueType = async (req, res) => {
   try {
+    if (req.user) {
+      const isCM = (req.user.role === 'office_staff' && req.user.dept && req.user.dept.toLowerCase().includes('maintenance')) || req.user.role === 'admin';
+      if (!isCM) {
+        return res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Only Campus Maintenance (CM) staff or Admin can create complaint types.',
+          },
+        });
+      }
+    }
+
     const { name, description } = req.body;
     if (!name || name.trim().length < 3 || name.trim().length > 80) {
       return res.status(422).json({
@@ -75,7 +87,7 @@ exports.createIssueType = async (req, res) => {
       issue_type_id,
       name: trimmedName,
       description: description ? description.trim() : '',
-      created_by: req.user ? req.user.email_id : 'admin@team21.com',
+      created_by: req.user ? req.user.email_id : 'cm@team21.com',
     });
 
     await newType.save();
@@ -88,6 +100,18 @@ exports.createIssueType = async (req, res) => {
 // PATCH /api/v1/fixit/issue-types/:id
 exports.updateIssueType = async (req, res) => {
   try {
+    if (req.user) {
+      const isCM = (req.user.role === 'office_staff' && req.user.dept && req.user.dept.toLowerCase().includes('maintenance')) || req.user.role === 'admin';
+      if (!isCM) {
+        return res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Only Campus Maintenance (CM) staff or Admin can update complaint types.',
+          },
+        });
+      }
+    }
+
     const type = await IssueType.findOne({ issue_type_id: req.params.id });
     if (!type) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Issue type not found' } });
@@ -121,6 +145,18 @@ exports.updateIssueType = async (req, res) => {
 // DELETE /api/v1/fixit/issue-types/:id
 exports.deleteIssueType = async (req, res) => {
   try {
+    if (req.user) {
+      const isCM = (req.user.role === 'office_staff' && req.user.dept && req.user.dept.toLowerCase().includes('maintenance')) || req.user.role === 'admin';
+      if (!isCM) {
+        return res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Only Campus Maintenance (CM) staff or Admin can delete complaint types.',
+          },
+        });
+      }
+    }
+
     const type = await IssueType.findOneAndDelete({ issue_type_id: req.params.id });
     if (!type) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Issue type not found' } });

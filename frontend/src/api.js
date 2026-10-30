@@ -125,6 +125,14 @@ export const apiCreateTicket = async (formData) => {
   });
 };
 
+export const apiUpdateTicket = async (ticket_id, formDataOrJson) => {
+  const isFormData = formDataOrJson instanceof FormData;
+  return request(`${API_BASE}/fixit/tickets/${ticket_id}`, {
+    method: 'PATCH',
+    body: isFormData ? formDataOrJson : JSON.stringify(formDataOrJson),
+  });
+};
+
 export const apiUpdateTicketStatus = async (ticket_id, formDataOrJson) => {
   const isFormData = formDataOrJson instanceof FormData;
   return request(`${API_BASE}/fixit/tickets/${ticket_id}/status`, {
@@ -167,6 +175,13 @@ export const apiGetIssueTypes = async () => {
 export const apiCreateIssueType = async ({ name, description }) => {
   return request(`${API_BASE}/fixit/issue-types`, {
     method: 'POST',
+    body: JSON.stringify({ name, description }),
+  });
+};
+
+export const apiUpdateIssueType = async (issue_type_id, { name, description }) => {
+  return request(`${API_BASE}/fixit/issue-types/${issue_type_id}`, {
+    method: 'PATCH',
     body: JSON.stringify({ name, description }),
   });
 };
