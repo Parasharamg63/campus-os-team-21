@@ -115,11 +115,13 @@ exports.listTickets = async (req, res) => {
     const { status, issue_type_id, mine, limit = 25, cursor, search } = req.query;
     const query = {};
 
-    if (status) {
+    if (status === 'overdue') {
+      query.overdue = true;
+    } else if (status && status !== 'all') {
       query.status = status;
     }
 
-    if (issue_type_id) {
+    if (issue_type_id && issue_type_id !== 'all') {
       query.issue_type_id = issue_type_id;
     }
 
@@ -130,12 +132,13 @@ exports.listTickets = async (req, res) => {
         { description: { $regex: search, $options: 'i' } },
         { location: { $regex: search, $options: 'i' } },
         { reported_by_name: { $regex: search, $options: 'i' } },
+        { reported_by_dept: { $regex: search, $options: 'i' } },
       ];
     }
 
     // Role-based visibility
     if (req.user) {
-      const isCM = (req.user.role === 'office_staff' && req.user.dept && req.user.dept.toLowerCase().includes('maintenance')) || req.user.role === 'admin';
+      const isCM = req.user.role === 'office_staff' || req.user.role === 'admin' || (req.user.dept && req.user.dept.toLowerCase().includes('maintenance'));
 
       if (!isCM) {
         // Students & faculty see only their own tickets
@@ -153,7 +156,7 @@ exports.listTickets = async (req, res) => {
       query._id = { $lt: cursor };
     }
 
-    const maxLimit = Math.min(parseInt(limit, 10) || 25, 100);
+    const maxLimit = Math.min(parseInt(limit, 10) || 100, 200);
     const tickets = await Ticket.find(query)
       .sort({ created_at: -1 })
       .limit(maxLimit + 1);
