@@ -8,14 +8,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://campus-os-backend-8sjf.onrender.com',
+        target: 'http://localhost:5000',
         changeOrigin: true,
-        secure: false,
       },
       '/uploads': {
-        target: 'https://campus-os-backend-8sjf.onrender.com',
+        target: 'http://localhost:5000',
         changeOrigin: true,
-        secure: false,
       },
     },
   },

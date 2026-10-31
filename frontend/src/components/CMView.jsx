@@ -10,7 +10,7 @@ import {
   apiCreateIssueType, apiUpdateIssueType, apiDeleteIssueType, downloadComplaintImage
 } from '../api';
 
-export default function CMView({ currentUser }) {
+export default function CMView({ currentUser, onOpenNotifications }) {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -576,7 +576,7 @@ export default function CMView({ currentUser }) {
                           <button
                             type="button"
                             className="btn btn-secondary btn-xs download-photo-btn"
-                            onClick={() => downloadComplaintImage(selectedTicket.ticket_id, `${selectedTicket.ticket_id}-defect.jpg`, 'defect')}
+                            onClick={() => downloadComplaintImage(selectedTicket.photo?.url || selectedTicket.photo_url, `${selectedTicket.ticket_id}-defect.jpg`)}
                             title="Download Defect Photo"
                           >
                             <Download size={13} />
@@ -600,7 +600,7 @@ export default function CMView({ currentUser }) {
                           <button
                             type="button"
                             className="btn btn-secondary btn-xs download-photo-btn"
-                            onClick={() => downloadComplaintImage(selectedTicket.ticket_id, `${selectedTicket.ticket_id}-resolution-proof.jpg`, 'resolution')}
+                            onClick={() => downloadComplaintImage(selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url, `${selectedTicket.ticket_id}-resolution-proof.jpg`)}
                             title="Download Resolution Proof Photo"
                           >
                             <Download size={13} />
@@ -978,7 +978,7 @@ export default function CMView({ currentUser }) {
                       title="Download Defect Photo"
                       onClick={(e) => {
                         e.stopPropagation();
-                        downloadComplaintImage(ticket.ticket_id, `${ticket.ticket_id}-defect.jpg`, 'defect');
+                        downloadComplaintImage(ticket.photo_url || ticket.photo?.url, `${ticket.ticket_id}-defect.jpg`);
                       }}
                     >
                       <Download size={12} />
@@ -1001,7 +1001,7 @@ export default function CMView({ currentUser }) {
                       title="Download Proof Photo"
                       onClick={(e) => {
                         e.stopPropagation();
-                        downloadComplaintImage(ticket.ticket_id, `${ticket.ticket_id}-resolution-proof.jpg`, 'resolution');
+                        downloadComplaintImage(ticket.proof_of_resolution_url || ticket.resolution_photo?.url, `${ticket.ticket_id}-resolution-proof.jpg`);
                       }}
                     >
                       <Download size={12} />
@@ -1571,7 +1571,7 @@ export default function CMView({ currentUser }) {
                     <button
                       type="button"
                       className="btn btn-secondary btn-xs download-photo-btn"
-                      onClick={() => downloadComplaintImage(inspectingTicket.ticket_id, `${inspectingTicket.ticket_id}-defect.jpg`, 'defect')}
+                      onClick={() => downloadComplaintImage(inspectingTicket.photo_url || inspectingTicket.photo?.url, `${inspectingTicket.ticket_id}-defect.jpg`)}
                       title="Download Defect Image"
                     >
                       <Download size={12} />
@@ -1598,7 +1598,7 @@ export default function CMView({ currentUser }) {
                     <button
                       type="button"
                       className="btn btn-secondary btn-xs download-photo-btn"
-                      onClick={() => downloadComplaintImage(inspectingTicket.ticket_id, `${inspectingTicket.ticket_id}-resolution-proof.jpg`, 'resolution')}
+                      onClick={() => downloadComplaintImage(inspectingTicket.proof_of_resolution_url || inspectingTicket.resolution_photo?.url, `${inspectingTicket.ticket_id}-resolution-proof.jpg`)}
                       title="Download Resolution Proof Image"
                     >
                       <Download size={12} />

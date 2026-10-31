@@ -6,13 +6,13 @@ import {
   Edit2, Trash2, X, Download, Image
 } from 'lucide-react';
 import {
-  apiGetTickets, apiGetTicket, apiCreateTicket, apiAcknowledgeTicket,
-  apiGetIssueTypes, apiUpdateTicket, apiDeleteTicket,
+  apiGetTickets, apiCreateTicket, apiTrackTicket, apiAcknowledgeTicket,
+  apiGetIssueTypes, apiSubmitFeedback, apiGetFeedbacks, apiUpdateTicket, apiDeleteTicket,
   downloadComplaintImage
 } from '../api';
 
-export default function StudentView({ currentUser, activeRole, onSelectRole }) {
-  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard | raise | track
+export default function StudentView({ currentUser, onOpenNotifications, onSelectRole }) {
+  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard | raise | track | reviews
   const [tickets, setTickets] = useState([]);
   const [issueTypes, setIssueTypes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -40,6 +40,13 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
   const [trackLoading, setTrackLoading] = useState(false);
   const [trackError, setTrackError] = useState('');
 
+  // Reviews & Feedback State
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [rating, setRating] = useState(5);
+  const [feedbackCategory, setFeedbackCategory] = useState('Classroom Infrastructure');
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
   // Edit Complaint State (Spec Option 3: PATCH/DELETE /tickets/{id} for reporter while open)
   const [editingTicket, setEditingTicket] = useState(null);
   const [editFormData, setEditFormData] = useState({
@@ -57,6 +64,7 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
   useEffect(() => {
     loadTickets();
     loadIssueTypes();
+    loadFeedbacks();
     if (currentUser) {
       setFormData(prev => ({
         ...prev,
@@ -108,6 +116,15 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
       if (res.items && res.items.length > 0 && !formData.issue_type_id) {
         setFormData(prev => ({ ...prev, issue_type_id: res.items[0].issue_type_id }));
       }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const loadFeedbacks = async () => {
+    try {
+      const res = await apiGetFeedbacks();
+      setFeedbacks(res || []);
     } catch (err) {
       console.error(err);
     }
@@ -187,22 +204,15 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
   // Handle Track Lookup
   const handleTrackSubmit = async (e) => {
     if (e) e.preventDefault();
-    const query = trackQuery.trim();
-    if (!query) {
+    if (!trackQuery.trim()) {
       setTrackError('Please enter a valid Track ID.');
       return;
     }
     try {
       setTrackLoading(true);
       setTrackError('');
-      // First check locally loaded tickets for instantaneous match
-      const local = tickets.find(t => t.ticket_id.toLowerCase() === query.toLowerCase());
-      if (local) {
-        setTrackedTicket(local);
-      } else {
-        const res = await apiGetTicket(query);
-        setTrackedTicket(res);
-      }
+      const res = await apiTrackTicket(trackQuery.trim());
+      setTrackedTicket(res);
     } catch (err) {
       setTrackedTicket(null);
       setTrackError(err.message || `No complaint found with Track ID "${trackQuery}"`);
@@ -223,6 +233,29 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
       setErrorMsg(err.message || 'Failed to acknowledge.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle Feedback Submit
+  const handleFeedbackSubmit = async (e) => {
+    e.preventDefault();
+    if (!feedbackComment.trim()) return;
+    try {
+      setSubmittingFeedback(true);
+      await apiSubmitFeedback({
+        rating,
+        category: feedbackCategory,
+        comment: feedbackComment,
+        author_name: currentUser?.name || formData.name,
+        author_email: currentUser?.email_id || (userRole === 'faculty' ? 'meera@team21.com' : userRole === 'office_staff' ? 'priya@team21.com' : 'asha@team21.com'),
+      });
+      setFeedbackComment('');
+      setSuccessMsg('Thank you for your valuable feedback!');
+      loadFeedbacks();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to submit feedback.');
+    } finally {
+      setSubmittingFeedback(false);
     }
   };
 
@@ -377,6 +410,14 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
           <Search size={17} />
           <span>Track Cmp</span>
         </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'reviews' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('reviews'); setErrorMsg(''); setSuccessMsg(''); }}
+        >
+          <Star size={17} />
+          <span>Reviews & Feedback</span>
+        </button>
       </div>
 
       {/* Messages */}
@@ -435,26 +476,26 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
             </div>
           </div>
 
-          {/* Quick Action Cards */}
+          {/* Quick Action Cards matching wireframe Page 2 */}
           <div className="quick-actions-row">
-            <div className="action-tile" onClick={() => setActiveTab('raise')}>
-              <div className="tile-icon-box blue">
-                <PlusCircle size={22} />
+            <div className="action-tile" onClick={() => setActiveTab('reviews')}>
+              <div className="tile-icon-box gold">
+                <Star size={22} />
               </div>
               <div className="tile-details">
-                <h4>Raise Complaint</h4>
-                <p>Report electrical, carpentry, civil or IT defect in your area</p>
+                <h4>Reviews</h4>
+                <p>Check satisfaction ratings and feedback from campus peers</p>
               </div>
               <ChevronRight size={18} className="tile-arrow" />
             </div>
 
-            <div className="action-tile" onClick={() => setActiveTab('track')}>
-              <div className="tile-icon-box green">
-                <Search size={22} />
+            <div className="action-tile" onClick={() => setActiveTab('reviews')}>
+              <div className="tile-icon-box purple">
+                <MessageSquare size={22} />
               </div>
               <div className="tile-details">
-                <h4>Track Status</h4>
-                <p>Live progress tracking, TAT expected fix date and acknowledge</p>
+                <h4>Feedback</h4>
+                <p>Share your suggestions or rate recently resolved issues</p>
               </div>
               <ChevronRight size={18} className="tile-arrow" />
             </div>
@@ -536,7 +577,7 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
                               type="button"
                               className="chip-download-btn"
                               title="Download Defect Photo"
-                              onClick={() => downloadComplaintImage(t.ticket_id, `${t.ticket_id}-defect.jpg`, 'defect')}
+                              onClick={() => downloadComplaintImage(t.photo?.url || t.photo_url, `${t.ticket_id}-defect.jpg`)}
                             >
                               <Download size={13} />
                               <span>Download</span>
@@ -551,7 +592,7 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
                               type="button"
                               className="chip-download-btn"
                               title="Download Resolution Proof Photo"
-                              onClick={() => downloadComplaintImage(t.ticket_id, `${t.ticket_id}-resolution-proof.jpg`, 'resolution')}
+                              onClick={() => downloadComplaintImage(t.resolution_photo?.url || t.proof_of_resolution_url, `${t.ticket_id}-resolution-proof.jpg`)}
                             >
                               <Download size={13} />
                               <span>Download</span>
@@ -571,7 +612,7 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
                           onClick={() => {
                             setTrackQuery(t.ticket_id);
                             setActiveTab('track');
-                            setTrackedTicket(t);
+                            apiTrackTicket(t.ticket_id).then(res => setTrackedTicket(res));
                           }}
                         >
                           <Search size={14} />
@@ -934,7 +975,7 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm download-photo-btn"
-                        onClick={() => downloadComplaintImage(trackedTicket.ticket_id, `${trackedTicket.ticket_id}-defect.jpg`, 'defect')}
+                        onClick={() => downloadComplaintImage(trackedTicket.photo?.url || trackedTicket.photo_url, `${trackedTicket.ticket_id}-defect.jpg`)}
                         title="Download Problem Photo"
                       >
                         <Download size={14} />
@@ -1014,7 +1055,7 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
                               <button
                                 type="button"
                                 className="btn btn-secondary btn-xs download-photo-btn"
-                                onClick={() => downloadComplaintImage(trackedTicket.ticket_id, `${trackedTicket.ticket_id}-resolution-proof.jpg`, 'resolution')}
+                                onClick={() => downloadComplaintImage(trackedTicket.resolution_photo?.url || trackedTicket.proof_of_resolution_url, `${trackedTicket.ticket_id}-resolution-proof.jpg`)}
                                 title="Download Proof of Fix Image"
                               >
                                 <Download size={12} />
@@ -1067,7 +1108,85 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
         </div>
       )}
 
+      {/* TAB 4: REVIEWS & FEEDBACK */}
+      {activeTab === 'reviews' && (
+        <div className="reviews-feedback-wrapper">
+          <div className="feedback-form-card card">
+            <h2>Share Your Experience / Review</h2>
+            <p className="feedback-sub">Help us maintain quality campus facilities through your feedback.</p>
 
+            <form onSubmit={handleFeedbackSubmit}>
+              <div className="form-group">
+                <label className="form-label">Rating</label>
+                <div className="star-rating-row">
+                  {[1, 2, 3, 4, 5].map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      className={`star-btn ${s <= rating ? 'filled' : ''}`}
+                      onClick={() => setRating(s)}
+                    >
+                      ★
+                    </button>
+                  ))}
+                  <span className="rating-label-num">{rating} of 5 Stars</span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Facility Category</label>
+                <select
+                  className="form-select"
+                  value={feedbackCategory}
+                  onChange={e => setFeedbackCategory(e.target.value)}
+                >
+                  <option value="Classroom Infrastructure">Classroom Infrastructure</option>
+                  <option value="IT & Computer Labs">IT & Computer Labs</option>
+                  <option value="Sanitation & Washrooms">Sanitation & Washrooms</option>
+                  <option value="Hostel Facilities">Hostel Facilities</option>
+                  <option value="Campus Maintenance Speed">Maintenance Response Speed</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Review / Feedback Comments</label>
+                <textarea
+                  className="form-textarea"
+                  placeholder="Share details about the resolution or suggestions for improvement..."
+                  value={feedbackComment}
+                  onChange={e => setFeedbackComment(e.target.value)}
+                  required
+                />
+              </div>
+
+              <button type="submit" className="btn btn-primary" disabled={submittingFeedback}>
+                {submittingFeedback ? 'Submitting...' : 'Post Review'}
+              </button>
+            </form>
+          </div>
+
+          <div className="existing-reviews-section">
+            <h3 className="existing-reviews-title">Recent Campus Reviews ({feedbacks.length})</h3>
+            <div className="reviews-list">
+              {feedbacks.map(f => (
+                <div key={f._id} className="review-card">
+                  <div className="review-top-row">
+                    <span className="author-name">{f.author_name}</span>
+                    <div className="stars-display">
+                      {'★'.repeat(f.rating)}{'☆'.repeat(5 - f.rating)}
+                    </div>
+                  </div>
+                  <span className="review-cat-tag">{f.category}</span>
+                  <p className="review-comment-p">"{f.comment}"</p>
+                  <span className="review-date-str">
+                    {new Date(f.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Footer matching wireframe Page 2 bottom */}
       <footer className="student-phone-footer">
@@ -1163,7 +1282,7 @@ export default function StudentView({ currentUser, activeRole, onSelectRole }) {
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
-                        onClick={() => downloadComplaintImage(editingTicket?.ticket_id || editPhotoPreview, `${editingTicket?.ticket_id || 'complaint'}-defect.jpg`, 'defect')}
+                        onClick={() => downloadComplaintImage(editPhotoPreview, `${editingTicket?.ticket_id || 'complaint'}-defect.jpg`)}
                         title="Download Photo"
                       >
                         <Download size={14} />
