@@ -22,6 +22,7 @@ router.get('/tickets/:ticket_id', optionalAuth, ticketController.getTicket);
 router.patch('/tickets/:ticket_id', optionalAuth, upload.single('photo'), ticketController.updateTicket);
 router.delete('/tickets/:ticket_id', optionalAuth, ticketController.deleteTicket);
 router.get('/tickets/:ticket_id/photo', ticketController.getTicketPhoto);
+router.get('/tickets/:ticket_id/download-photo', ticketController.downloadTicketPhoto);
 
 // Status update by Campus Maintenance / Admin
 router.put('/tickets/:ticket_id/status', optionalAuth, upload.single('photo'), ticketController.updateStatus);

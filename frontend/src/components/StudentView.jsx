@@ -3,11 +3,12 @@ import {
   PlusCircle, Search, Clock, CheckCircle2, AlertCircle, FileText,
   Upload, Star, MessageSquare, ArrowLeft, Copy, Check, ExternalLink,
   ChevronRight, RefreshCw, Send, ShieldAlert, Sparkles, MapPin, Phone, User,
-  Edit2, Trash2, X
+  Edit2, Trash2, X, Download, Image
 } from 'lucide-react';
 import {
   apiGetTickets, apiCreateTicket, apiTrackTicket, apiAcknowledgeTicket,
-  apiGetIssueTypes, apiSubmitFeedback, apiGetFeedbacks, apiUpdateTicket, apiDeleteTicket
+  apiGetIssueTypes, apiSubmitFeedback, apiGetFeedbacks, apiUpdateTicket, apiDeleteTicket,
+  downloadComplaintImage
 } from '../api';
 
 export default function StudentView({ currentUser, onOpenNotifications, onSelectRole }) {
@@ -532,6 +533,42 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
                       </div>
                     )}
 
+                    {/* Attached Photos download preview strip */}
+                    {(t.photo?.url || t.photo_url || t.resolution_photo?.url || t.proof_of_resolution_url) && (
+                      <div className="ticket-photos-preview-bar">
+                        {(t.photo?.url || t.photo_url) && (
+                          <div className="photo-preview-chip">
+                            <img src={t.photo?.url || t.photo_url} alt="Defect" className="tiny-chip-thumb" />
+                            <span className="chip-name">Defect Photo</span>
+                            <button
+                              type="button"
+                              className="chip-download-btn"
+                              title="Download Defect Photo"
+                              onClick={() => downloadComplaintImage(t.photo?.url || t.photo_url, `${t.ticket_id}-defect.jpg`)}
+                            >
+                              <Download size={13} />
+                              <span>Download</span>
+                            </button>
+                          </div>
+                        )}
+                        {(t.resolution_photo?.url || t.proof_of_resolution_url) && (
+                          <div className="photo-preview-chip chip-proof">
+                            <img src={t.resolution_photo?.url || t.proof_of_resolution_url} alt="Proof" className="tiny-chip-thumb" />
+                            <span className="chip-name">Resolution Proof</span>
+                            <button
+                              type="button"
+                              className="chip-download-btn"
+                              title="Download Resolution Proof Photo"
+                              onClick={() => downloadComplaintImage(t.resolution_photo?.url || t.proof_of_resolution_url, `${t.ticket_id}-resolution-proof.jpg`)}
+                            >
+                              <Download size={13} />
+                              <span>Download</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="ticket-card-footer">
                       <span className="reported-date">
                         {new Date(t.created_at).toLocaleDateString()} {new Date(t.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -893,10 +930,21 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
                 )}
 
                 {/* Photo Preview if attached */}
-                {trackedTicket.photo?.url && (
+                {(trackedTicket.photo?.url || trackedTicket.photo_url) && (
                   <div className="photo-attachment-card">
-                    <span className="photo-header-lbl">Problem Photo:</span>
-                    <img src={trackedTicket.photo.url} alt="Problem defect" className="tracked-photo-img" />
+                    <div className="photo-card-head-row">
+                      <span className="photo-header-lbl">Problem Defect Photo:</span>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm download-photo-btn"
+                        onClick={() => downloadComplaintImage(trackedTicket.photo?.url || trackedTicket.photo_url, `${trackedTicket.ticket_id}-defect.jpg`)}
+                        title="Download Problem Photo"
+                      >
+                        <Download size={14} />
+                        <span>Download Image</span>
+                      </button>
+                    </div>
+                    <img src={trackedTicket.photo?.url || trackedTicket.photo_url} alt="Problem defect" className="tracked-photo-img" />
                   </div>
                 )}
 
@@ -962,10 +1010,21 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
                             ? (trackedTicket.update?.note || 'Facility work completed successfully')
                             : 'Technician will mark as resolved upon repair'}
                         </p>
-                        {trackedTicket.resolution_photo?.url && (
+                        {(trackedTicket.resolution_photo?.url || trackedTicket.proof_of_resolution_url) && (
                           <div className="resolution-proof-preview">
-                            <span className="proof-lbl">Proof of fix:</span>
-                            <img src={trackedTicket.resolution_photo.url} alt="Resolution" className="proof-thumb" />
+                            <div className="proof-head-row">
+                              <span className="proof-lbl">Proof of fix:</span>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-xs download-photo-btn"
+                                onClick={() => downloadComplaintImage(trackedTicket.resolution_photo?.url || trackedTicket.proof_of_resolution_url, `${trackedTicket.ticket_id}-resolution-proof.jpg`)}
+                                title="Download Proof of Fix Image"
+                              >
+                                <Download size={12} />
+                                <span>Download Proof</span>
+                              </button>
+                            </div>
+                            <img src={trackedTicket.resolution_photo?.url || trackedTicket.proof_of_resolution_url} alt="Resolution" className="proof-thumb" />
                           </div>
                         )}
                       </div>
@@ -1182,6 +1241,15 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
                         <Upload size={14} />
                         <span>Change Photo</span>
                       </label>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => downloadComplaintImage(editPhotoPreview, `${editingTicket?.ticket_id || 'complaint'}-defect.jpg`)}
+                        title="Download Photo"
+                      >
+                        <Download size={14} />
+                        <span>Download</span>
+                      </button>
                       <button
                         type="button"
                         className="btn btn-danger-outline btn-sm"

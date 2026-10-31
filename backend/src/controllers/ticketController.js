@@ -309,17 +309,66 @@ exports.deleteTicket = async (req, res) => {
 // GET /api/v1/fixit/tickets/:ticket_id/photo
 exports.getTicketPhoto = async (req, res) => {
   try {
+    const { type = 'defect', download } = req.query; // type: 'defect' | 'resolution'
     const ticket = await Ticket.findOne({ ticket_id: req.params.ticket_id });
-    if (!ticket || !ticket.photo || !ticket.photo.url) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Ticket photo not found' } });
+    if (!ticket) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Ticket not found' } });
     }
-    const filename = path.basename(ticket.photo.url);
+
+    const targetPhoto = type === 'resolution' ? ticket.resolution_photo : ticket.photo;
+    if (!targetPhoto || !targetPhoto.url) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: `${type === 'resolution' ? 'Resolution' : 'Complaint'} photo not found` },
+      });
+    }
+
+    const filename = path.basename(targetPhoto.url);
     const filePath = path.join(__dirname, '../../uploads', filename);
+    const ext = path.extname(filename) || '.jpg';
+    const downloadName = `${ticket.ticket_id}-${type === 'resolution' ? 'resolution-proof' : 'defect'}${ext}`;
+
+    if (download === 'true' || download === '1') {
+      if (fs.existsSync(filePath)) {
+        return res.download(filePath, downloadName);
+      }
+      return res.redirect(targetPhoto.url);
+    }
 
     if (fs.existsSync(filePath)) {
       return res.sendFile(filePath);
     } else {
-      return res.redirect(ticket.photo.url);
+      return res.redirect(targetPhoto.url);
+    }
+  } catch (error) {
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: error.message } });
+  }
+};
+
+// GET /api/v1/fixit/tickets/:ticket_id/download-photo
+exports.downloadTicketPhoto = async (req, res) => {
+  try {
+    const { type = 'defect' } = req.query; // 'defect' | 'resolution'
+    const ticket = await Ticket.findOne({ ticket_id: req.params.ticket_id });
+    if (!ticket) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Ticket not found' } });
+    }
+
+    const targetPhoto = type === 'resolution' ? ticket.resolution_photo : ticket.photo;
+    if (!targetPhoto || !targetPhoto.url) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: `${type === 'resolution' ? 'Resolution' : 'Complaint'} photo not found for ticket ${ticket.ticket_id}` },
+      });
+    }
+
+    const filename = path.basename(targetPhoto.url);
+    const filePath = path.join(__dirname, '../../uploads', filename);
+    const ext = path.extname(filename) || '.jpg';
+    const downloadName = `${ticket.ticket_id}-${type === 'resolution' ? 'resolution-proof' : 'defect'}${ext}`;
+
+    if (fs.existsSync(filePath)) {
+      return res.download(filePath, downloadName);
+    } else {
+      return res.redirect(targetPhoto.url);
     }
   } catch (error) {
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: error.message } });

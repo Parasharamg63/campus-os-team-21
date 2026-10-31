@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Shield, BarChart3, Users, Wrench, AlertTriangle, CheckCircle2,
   Clock, Trash2, UserPlus, FolderPlus, Search, RefreshCw, Send,
-  ArrowRight, Check, Eye, MapPin, Phone, Mail
+  ArrowRight, Check, Eye, MapPin, Phone, Mail, Download, Image
 } from 'lucide-react';
 import {
   apiGetTickets, apiGetAdminStats, apiGetAdminUsers, apiCreateAdminUser,
   apiDeleteAdminUser, apiGetIssueTypes, apiCreateIssueType, apiDeleteIssueType,
-  apiAssignTicket, apiDeleteTicket, apiUpdateTicketStatus
+  apiAssignTicket, apiDeleteTicket, apiUpdateTicketStatus, downloadComplaintImage
 } from '../api';
 
 export default function AdminView({ currentUser }) {
@@ -381,6 +381,46 @@ export default function AdminView({ currentUser }) {
                     <span className="meta-loc"><MapPin size={12} /> {t.location}</span>
                   </div>
 
+                  {/* Attached Photos Chips */}
+                  {(t.photo?.url || t.photo_url || t.resolution_photo?.url || t.proof_of_resolution_url) && (
+                    <div className="admin-card-photos-strip">
+                      {(t.photo?.url || t.photo_url) && (
+                        <div className="admin-photo-chip">
+                          <img src={t.photo?.url || t.photo_url} alt="Defect" className="tiny-chip-thumb" />
+                          <span className="chip-name">Defect Photo</span>
+                          <button
+                            type="button"
+                            className="chip-download-btn"
+                            title="Download Defect Photo"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadComplaintImage(t.photo?.url || t.photo_url, `${t.ticket_id}-defect.jpg`);
+                            }}
+                          >
+                            <Download size={12} />
+                          </button>
+                        </div>
+                      )}
+                      {(t.resolution_photo?.url || t.proof_of_resolution_url) && (
+                        <div className="admin-photo-chip chip-proof">
+                          <img src={t.resolution_photo?.url || t.proof_of_resolution_url} alt="Proof" className="tiny-chip-thumb" />
+                          <span className="chip-name">Resolution Proof</span>
+                          <button
+                            type="button"
+                            className="chip-download-btn"
+                            title="Download Resolution Proof Photo"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadComplaintImage(t.resolution_photo?.url || t.proof_of_resolution_url, `${t.ticket_id}-resolution-proof.jpg`);
+                            }}
+                          >
+                            <Download size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="card-bottom-bar">
                     <span className="reported-by-info">
                       By: {t.reported_by_name} ({t.reported_by_dept || 'Student'})
@@ -431,6 +471,46 @@ export default function AdminView({ currentUser }) {
                   {t.update?.note && (
                     <div className="res-note-preview">
                       <span className="note-lead">Fix Note:</span> "{t.update.note}"
+                    </div>
+                  )}
+
+                  {/* Attached Photos Chips */}
+                  {(t.photo?.url || t.photo_url || t.resolution_photo?.url || t.proof_of_resolution_url) && (
+                    <div className="admin-card-photos-strip">
+                      {(t.photo?.url || t.photo_url) && (
+                        <div className="admin-photo-chip">
+                          <img src={t.photo?.url || t.photo_url} alt="Defect" className="tiny-chip-thumb" />
+                          <span className="chip-name">Defect Photo</span>
+                          <button
+                            type="button"
+                            className="chip-download-btn"
+                            title="Download Defect Photo"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadComplaintImage(t.photo?.url || t.photo_url, `${t.ticket_id}-defect.jpg`);
+                            }}
+                          >
+                            <Download size={12} />
+                          </button>
+                        </div>
+                      )}
+                      {(t.resolution_photo?.url || t.proof_of_resolution_url) && (
+                        <div className="admin-photo-chip chip-proof">
+                          <img src={t.resolution_photo?.url || t.proof_of_resolution_url} alt="Proof" className="tiny-chip-thumb" />
+                          <span className="chip-name">Resolution Proof</span>
+                          <button
+                            type="button"
+                            className="chip-download-btn"
+                            title="Download Resolution Proof Photo"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadComplaintImage(t.resolution_photo?.url || t.proof_of_resolution_url, `${t.ticket_id}-resolution-proof.jpg`);
+                            }}
+                          >
+                            <Download size={12} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -790,10 +870,44 @@ export default function AdminView({ currentUser }) {
                 <div><span>Status:</span> <span className={`badge badge-${selectedTicket.status}`}>{selectedTicket.status}</span></div>
               </div>
 
-              {selectedTicket.photo?.url && (
-                <div className="modal-photo-section">
-                  <span className="photo-label">Student Attached Image:</span>
-                  <img src={selectedTicket.photo.url} alt="Problem" className="modal-photo-img" />
+              {/* Photo Evidence Section in Admin Modal */}
+              {((selectedTicket.photo?.url || selectedTicket.photo_url) || (selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url)) && (
+                <div className="admin-modal-photos-grid">
+                  {(selectedTicket.photo?.url || selectedTicket.photo_url) && (
+                    <div className="modal-photo-section">
+                      <div className="photo-card-head-row">
+                        <span className="photo-label">📸 Student Attached Photo:</span>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-xs download-photo-btn"
+                          onClick={() => downloadComplaintImage(selectedTicket.photo?.url || selectedTicket.photo_url, `${selectedTicket.ticket_id}-defect.jpg`)}
+                          title="Download Defect Photo"
+                        >
+                          <Download size={13} />
+                          <span>Download Image</span>
+                        </button>
+                      </div>
+                      <img src={selectedTicket.photo?.url || selectedTicket.photo_url} alt="Defect" className="modal-photo-img" />
+                    </div>
+                  )}
+
+                  {(selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url) && (
+                    <div className="modal-photo-section proof-section">
+                      <div className="photo-card-head-row">
+                        <span className="photo-label proof-label">✅ Resolution Proof Photo:</span>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-xs download-photo-btn"
+                          onClick={() => downloadComplaintImage(selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url, `${selectedTicket.ticket_id}-resolution-proof.jpg`)}
+                          title="Download Resolution Proof Photo"
+                        >
+                          <Download size={13} />
+                          <span>Download Proof</span>
+                        </button>
+                      </div>
+                      <img src={selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url} alt="Resolution" className="modal-photo-img" />
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -236,3 +236,31 @@ export const apiSubmitFeedback = async (data) => {
     body: JSON.stringify(data),
   });
 };
+
+// Image Download Helper for Complaints
+export const downloadComplaintImage = async (imageUrl, defaultFilename = 'complaint-image.jpg') => {
+  if (!imageUrl) return;
+  try {
+    const response = await fetch(imageUrl, { mode: 'cors' });
+    if (!response.ok) throw new Error('Failed to fetch image data');
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = defaultFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+  } catch (err) {
+    console.warn('Direct blob download failed, falling back to direct link:', err);
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = defaultFilename;
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+};

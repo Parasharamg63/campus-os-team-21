@@ -133,4 +133,13 @@ ticketSchema.virtual('overdue').get(function () {
   return this.tat.expected_by < today;
 });
 
+// Virtuals for photo URLs
+ticketSchema.virtual('photo_url').get(function () {
+  return this.photo && this.photo.url ? this.photo.url : undefined;
+});
+
+ticketSchema.virtual('proof_of_resolution_url').get(function () {
+  return this.resolution_photo && this.resolution_photo.url ? this.resolution_photo.url : undefined;
+});
+
 module.exports = mongoose.model('Ticket', ticketSchema);

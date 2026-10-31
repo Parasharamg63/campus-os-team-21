@@ -3,11 +3,11 @@ import {
   Wrench, CheckCircle, Clock, AlertTriangle, RefreshCw, Upload,
   Calendar, Check, Search, Filter, ShieldCheck, ChevronRight, User, MapPin,
   Plus, Trash2, Edit2, Tag, Layers, Zap, Droplets, CheckCircle2, X, PlusCircle,
-  ClipboardList, Eye, FileText, ExternalLink, Copy
+  ClipboardList, Eye, FileText, ExternalLink, Copy, Download, Image
 } from 'lucide-react';
 import {
   apiGetTickets, apiUpdateTicketStatus, apiSetTAT, apiGetIssueTypes, apiDeleteTicket,
-  apiCreateIssueType, apiUpdateIssueType, apiDeleteIssueType
+  apiCreateIssueType, apiUpdateIssueType, apiDeleteIssueType, downloadComplaintImage
 } from '../api';
 
 export default function CMView({ currentUser, onOpenNotifications }) {
@@ -546,10 +546,56 @@ export default function CMView({ currentUser, onOpenNotifications }) {
                   </div>
                 </div>
 
-                {selectedTicket.photo?.url && (
-                  <div className="original-photo-wrap">
-                    <span className="photo-label">Student Attached Photo:</span>
-                    <img src={selectedTicket.photo.url} alt="Attached" className="task-proof-img" />
+                {/* Attached Complaint & Proof Photos in Work Order */}
+                {(selectedTicket.photo?.url || selectedTicket.photo_url || selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url) && (
+                  <div className="task-photos-flex-row">
+                    {(selectedTicket.photo?.url || selectedTicket.photo_url) && (
+                      <div className="original-photo-wrap">
+                        <div className="photo-card-head-row">
+                          <span className="photo-label">Student Attached Photo:</span>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-xs download-photo-btn"
+                            onClick={() => downloadComplaintImage(selectedTicket.photo?.url || selectedTicket.photo_url, `${selectedTicket.ticket_id}-defect.jpg`)}
+                            title="Download Defect Photo"
+                          >
+                            <Download size={13} />
+                            <span>Download</span>
+                          </button>
+                        </div>
+                        <img
+                          src={selectedTicket.photo?.url || selectedTicket.photo_url}
+                          alt="Attached Defect"
+                          className="task-proof-img"
+                          onClick={() => setPreviewPhotoUrl(selectedTicket.photo?.url || selectedTicket.photo_url)}
+                          title="Click to enlarge"
+                        />
+                      </div>
+                    )}
+
+                    {(selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url) && (
+                      <div className="original-photo-wrap proof-photo-wrap">
+                        <div className="photo-card-head-row">
+                          <span className="photo-label proof-label">Resolution Proof Photo:</span>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-xs download-photo-btn"
+                            onClick={() => downloadComplaintImage(selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url, `${selectedTicket.ticket_id}-resolution-proof.jpg`)}
+                            title="Download Resolution Proof Photo"
+                          >
+                            <Download size={13} />
+                            <span>Download</span>
+                          </button>
+                        </div>
+                        <img
+                          src={selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url}
+                          alt="Resolution Proof"
+                          className="task-proof-img"
+                          onClick={() => setPreviewPhotoUrl(selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url)}
+                          title="Click to enlarge"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -894,26 +940,52 @@ export default function CMView({ currentUser, onOpenNotifications }) {
             </div>
 
             {/* Photos Row (Defect / Resolution) */}
-            {(ticket.photo_url || ticket.proof_of_resolution_url) && (
+            {(ticket.photo_url || ticket.photo?.url || ticket.proof_of_resolution_url || ticket.resolution_photo?.url) && (
               <div className="cm-card-photos-strip">
-                {ticket.photo_url && (
-                  <div
-                    className="photo-thumb-wrap"
-                    onClick={() => setPreviewPhotoUrl(ticket.photo_url)}
-                    title="Click to view full student defect photo"
-                  >
-                    <img src={ticket.photo_url} alt="Student Defect" className="photo-thumb" />
-                    <span className="photo-label">Defect Photo</span>
+                {(ticket.photo_url || ticket.photo?.url) && (
+                  <div className="photo-thumb-wrap">
+                    <div
+                      className="photo-thumb-inner"
+                      onClick={() => setPreviewPhotoUrl(ticket.photo_url || ticket.photo?.url)}
+                      title="Click to view full student defect photo"
+                    >
+                      <img src={ticket.photo_url || ticket.photo?.url} alt="Student Defect" className="photo-thumb" />
+                      <span className="photo-label">Defect Photo</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="thumb-download-icon-btn"
+                      title="Download Defect Photo"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadComplaintImage(ticket.photo_url || ticket.photo?.url, `${ticket.ticket_id}-defect.jpg`);
+                      }}
+                    >
+                      <Download size={12} />
+                    </button>
                   </div>
                 )}
-                {ticket.proof_of_resolution_url && (
-                  <div
-                    className="photo-thumb-wrap proof-thumb-wrap"
-                    onClick={() => setPreviewPhotoUrl(ticket.proof_of_resolution_url)}
-                    title="Click to view resolution proof photo"
-                  >
-                    <img src={ticket.proof_of_resolution_url} alt="Resolution Proof" className="photo-thumb" />
-                    <span className="photo-label proof-label">Proof of Work</span>
+                {(ticket.proof_of_resolution_url || ticket.resolution_photo?.url) && (
+                  <div className="photo-thumb-wrap proof-thumb-wrap">
+                    <div
+                      className="photo-thumb-inner"
+                      onClick={() => setPreviewPhotoUrl(ticket.proof_of_resolution_url || ticket.resolution_photo?.url)}
+                      title="Click to view resolution proof photo"
+                    >
+                      <img src={ticket.proof_of_resolution_url || ticket.resolution_photo?.url} alt="Resolution Proof" className="photo-thumb" />
+                      <span className="photo-label proof-label">Proof of Work</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="thumb-download-icon-btn"
+                      title="Download Proof Photo"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadComplaintImage(ticket.proof_of_resolution_url || ticket.resolution_photo?.url, `${ticket.ticket_id}-resolution-proof.jpg`);
+                      }}
+                    >
+                      <Download size={12} />
+                    </button>
                   </div>
                 )}
               </div>
@@ -1322,6 +1394,14 @@ export default function CMView({ currentUser, onOpenNotifications }) {
           <img src={previewPhotoUrl} alt="Evidence full preview" className="lightbox-full-img" />
         </div>
         <div className="lightbox-footer">
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => downloadComplaintImage(previewPhotoUrl, 'complaint-evidence.jpg')}
+          >
+            <Download size={14} />
+            <span>Download Image</span>
+          </button>
           <a
             href={previewPhotoUrl}
             target="_blank"
@@ -1329,11 +1409,11 @@ export default function CMView({ currentUser, onOpenNotifications }) {
             className="btn btn-secondary btn-sm"
           >
             <ExternalLink size={14} />
-            <span>Open Original Image</span>
+            <span>Open Original</span>
           </a>
           <button
             type="button"
-            className="btn btn-primary btn-sm"
+            className="btn btn-secondary btn-sm"
             onClick={() => setPreviewPhotoUrl(null)}
           >
             Close Preview
@@ -1464,14 +1544,25 @@ export default function CMView({ currentUser, onOpenNotifications }) {
             <div className="inspect-photos-col">
               <h5>Attached Photos</h5>
               
-              {inspectingTicket.photo_url ? (
+              {(inspectingTicket.photo_url || inspectingTicket.photo?.url) ? (
                 <div className="inspect-photo-card">
-                  <span className="photo-card-label">📸 Student Defect Photo</span>
+                  <div className="inspect-photo-card-head">
+                    <span className="photo-card-label">📸 Student Defect Photo</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs download-photo-btn"
+                      onClick={() => downloadComplaintImage(inspectingTicket.photo_url || inspectingTicket.photo?.url, `${inspectingTicket.ticket_id}-defect.jpg`)}
+                      title="Download Defect Image"
+                    >
+                      <Download size={12} />
+                      <span>Download Image</span>
+                    </button>
+                  </div>
                   <img
-                    src={inspectingTicket.photo_url}
+                    src={inspectingTicket.photo_url || inspectingTicket.photo?.url}
                     alt="Defect Photo"
                     className="inspect-img"
-                    onClick={() => setPreviewPhotoUrl(inspectingTicket.photo_url)}
+                    onClick={() => setPreviewPhotoUrl(inspectingTicket.photo_url || inspectingTicket.photo?.url)}
                   />
                 </div>
               ) : (
@@ -1480,14 +1571,25 @@ export default function CMView({ currentUser, onOpenNotifications }) {
                 </div>
               )}
 
-              {inspectingTicket.proof_of_resolution_url ? (
+              {(inspectingTicket.proof_of_resolution_url || inspectingTicket.resolution_photo?.url) ? (
                 <div className="inspect-photo-card proof-card">
-                  <span className="photo-card-label">✅ Resolution Proof Photo</span>
+                  <div className="inspect-photo-card-head">
+                    <span className="photo-card-label">✅ Resolution Proof Photo</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs download-photo-btn"
+                      onClick={() => downloadComplaintImage(inspectingTicket.proof_of_resolution_url || inspectingTicket.resolution_photo?.url, `${inspectingTicket.ticket_id}-resolution-proof.jpg`)}
+                      title="Download Resolution Proof Image"
+                    >
+                      <Download size={12} />
+                      <span>Download Proof</span>
+                    </button>
+                  </div>
                   <img
-                    src={inspectingTicket.proof_of_resolution_url}
+                    src={inspectingTicket.proof_of_resolution_url || inspectingTicket.resolution_photo?.url}
                     alt="Resolution Proof"
                     className="inspect-img"
-                    onClick={() => setPreviewPhotoUrl(inspectingTicket.proof_of_resolution_url)}
+                    onClick={() => setPreviewPhotoUrl(inspectingTicket.proof_of_resolution_url || inspectingTicket.resolution_photo?.url)}
                   />
                 </div>
               ) : (
