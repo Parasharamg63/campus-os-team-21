@@ -255,7 +255,7 @@ export default function AdminView({ currentUser }) {
           </div>
           <h2>Admin Oversight & Grievance Control</h2>
           <p className="admin-subtitle">
-            Institution: <b>Team 21 Engineering College</b> · Domain: <b>@team21.com</b> · Team OTP: <b>730792</b>
+            Institution: <b>Team 21 Engineering College</b> · Domain: <b>@team21.com</b> · Team OTP: <b>681305</b>
           </p>
         </div>
 

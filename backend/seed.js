@@ -24,12 +24,12 @@ const seedData = async () => {
     const users = [
       {
         role: 'admin',
-        name: 'Admin Officer',
+        name: 'Team 21 Admin',
         email_id: 'admin@team21.com',
-        phone_number: '9876543200',
+        phone_number: '9000000021',
         institution_name: 'Team 21 Engineering College',
         team_id: 'team21',
-        otp: '730792',
+        otp: '681305',
         created_by: 'system',
       },
       {
@@ -40,7 +40,7 @@ const seedData = async () => {
         dept: 'Campus Maintenance',
         designation: 'Supervisor',
         team_id: 'team21',
-        otp: '730792',
+        otp: '681305',
         created_by: 'admin@team21.com',
       },
       {
@@ -51,7 +51,7 @@ const seedData = async () => {
         dept: 'Campus Maintenance',
         designation: 'Senior Electrician',
         team_id: 'team21',
-        otp: '730792',
+        otp: '681305',
         created_by: 'admin@team21.com',
       },
       {
@@ -62,7 +62,7 @@ const seedData = async () => {
         usn: '1CF24CS001',
         dept: 'CSE',
         team_id: 'team21',
-        otp: '730792',
+        otp: '681305',
         created_by: 'admin@team21.com',
       },
       {
@@ -73,7 +73,7 @@ const seedData = async () => {
         usn: '1CF24EC045',
         dept: 'ECE',
         team_id: 'team21',
-        otp: '730792',
+        otp: '681305',
         created_by: 'admin@team21.com',
       },
       {
@@ -84,7 +84,7 @@ const seedData = async () => {
         dept: 'CSE',
         designation: 'Professor',
         team_id: 'team21',
-        otp: '730792',
+        otp: '681305',
         created_by: 'admin@team21.com',
       },
       {
@@ -95,7 +95,7 @@ const seedData = async () => {
         dept: 'Academic Administration',
         designation: 'Office Superintendent',
         team_id: 'team21',
-        otp: '730792',
+        otp: '681305',
         created_by: 'admin@team21.com',
       },
     ];

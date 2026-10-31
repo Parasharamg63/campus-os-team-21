@@ -6,7 +6,7 @@ exports.createUser = async (req, res) => {
   try {
     const { role, name, email_id, phone_number, usn, dept, designation } = req.body;
     const teamDomain = process.env.TEAM_DOMAIN || 'team21.com';
-    const teamOtp = process.env.TEAM_OTP || '730792';
+    const teamOtp = process.env.TEAM_OTP || '681305';
 
     if (!role || !['student', 'faculty', 'office_staff'].includes(role)) {
       return res.status(422).json({

@@ -1,7 +1,7 @@
 // Frontend API Client for आवाज (Avaaj) - CampusOS Track 4 FixIt
 // Strictly implements Section 4: FixIt Maintenance Tickets (/api/v1/fixit) & Auth
 
-const API_BASE = '/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/v1` : '/api/v1';
 
 // Token storage helpers
 export const getToken = () => localStorage.getItem('avaaj_token');

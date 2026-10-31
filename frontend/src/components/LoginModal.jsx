@@ -9,7 +9,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const [mainTab, setMainTab] = useState('non_admin'); // 'non_admin' | 'cm' | 'admin'
   const [nonAdminSubRole, setNonAdminSubRole] = useState('student'); // 'student' | 'faculty' | 'office_staff'
   const [emailId, setEmailId] = useState('asha@team21.com');
-  const [otp, setOtp] = useState('730792');
+  const [otp, setOtp] = useState('681305');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -25,7 +25,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     } else if (tab === 'admin') {
       setEmailId('admin@team21.com');
     }
-    setOtp('730792');
+    setOtp('681305');
   };
 
   const applySubRoleCredentials = (subRole) => {
@@ -37,7 +37,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     } else if (subRole === 'office_staff') {
       setEmailId('priya@team21.com');
     }
-    setOtp('730792');
+    setOtp('681305');
   };
 
   const handleSubRoleChange = (subRole) => {
@@ -243,10 +243,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
               className="form-input mono"
               value={otp}
               onChange={e => setOtp(e.target.value)}
-              placeholder="e.g. 730792"
+              placeholder="e.g. 681305"
               required
             />
-            <span className="form-hint">Team 21 default institutional OTP is <b>730792</b></span>
+            <span className="form-hint">Team 21 default institutional OTP is <b>681305</b></span>
           </div>
 
           <button type="submit" className="btn btn-primary btn-lg auth-submit-btn" disabled={loading}>

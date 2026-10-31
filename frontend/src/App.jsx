@@ -42,23 +42,23 @@ export default function App() {
   const autoLoginDefault = async (role) => {
     try {
       if (role === 'student') {
-        const res = await apiLoginUser('asha@team21.com', '730792');
+        const res = await apiLoginUser('asha@team21.com', '681305');
         setCurrentUserState(res.profile);
         setActiveRole('student');
       } else if (role === 'faculty') {
-        const res = await apiLoginUser('meera@team21.com', '730792');
+        const res = await apiLoginUser('meera@team21.com', '681305');
         setCurrentUserState(res.profile);
         setActiveRole('faculty');
       } else if (role === 'office_staff') {
-        const res = await apiLoginUser('priya@team21.com', '730792');
+        const res = await apiLoginUser('priya@team21.com', '681305');
         setCurrentUserState(res.profile);
         setActiveRole('office_staff');
       } else if (role === 'cm') {
-        const res = await apiLoginUser('kumar@team21.com', '730792');
+        const res = await apiLoginUser('kumar@team21.com', '681305');
         setCurrentUserState(res.profile);
         setActiveRole('cm');
       } else if (role === 'admin') {
-        const res = await apiLoginAdmin('admin@team21.com', '730792');
+        const res = await apiLoginAdmin('admin@team21.com', '681305');
         setCurrentUserState(res.profile);
         setActiveRole('admin');
       }

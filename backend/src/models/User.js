@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema({
   },
   otp: {
     type: String,
-    default: '730792',
+    default: '681305',
   },
   team_id: {
     type: String,
