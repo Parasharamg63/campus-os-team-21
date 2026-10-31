@@ -56,22 +56,42 @@ export default function CMView({ currentUser, onOpenNotifications }) {
   useEffect(() => {
     loadTickets();
     loadIssueTypes();
+
+    const interval = setInterval(() => {
+      loadTickets(true);
+    }, 6000);
+
+    const handleFocus = () => {
+      loadTickets(true);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [filterStatus]);
 
-  const loadTickets = async () => {
+  const loadTickets = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const params = { limit: 100 };
       if (filterStatus !== 'all') {
         params.status = filterStatus;
       }
       const res = await apiGetTickets(params);
-      setTickets(res.items || []);
+      const items = res.items || [];
+      setTickets(items);
+      // Keep selected ticket fresh
+      if (selectedTicket) {
+        const fresh = items.find(t => t.ticket_id === selectedTicket.ticket_id);
+        if (fresh) setSelectedTicket(fresh);
+      }
     } catch (err) {
       console.error(err);
-      setErrorMsg(err.message || 'Failed to load tickets');
+      if (!isSilent) setErrorMsg(err.message || 'Failed to load tickets');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 

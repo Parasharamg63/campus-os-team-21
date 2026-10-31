@@ -60,7 +60,7 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
   const [removeExistingPhoto, setRemoveExistingPhoto] = useState(false);
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
-  // Load initial data
+  // Load initial data and setup auto-refresh polling
   useEffect(() => {
     loadTickets();
     loadIssueTypes();
@@ -73,20 +73,39 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
         dept: currentUser.dept || (currentUser.role === 'office_staff' ? 'Academic Administration' : 'CSE'),
       }));
     }
+
+    const interval = setInterval(() => {
+      loadTickets(true);
+    }, 8000);
+
+    const handleFocus = () => {
+      loadTickets(true);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [currentUser]);
 
   const userRole = currentUser?.role || 'student';
   const roleNameLabel = userRole === 'faculty' ? 'Faculty' : userRole === 'office_staff' ? 'Office Staff' : 'Student';
 
-  const loadTickets = async () => {
+  const loadTickets = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const res = await apiGetTickets({ mine: true });
-      setTickets(res.items || []);
+      const items = res.items || [];
+      setTickets(items);
+      if (trackedTicket) {
+        const fresh = items.find(t => t.ticket_id === trackedTicket.ticket_id);
+        if (fresh) setTrackedTicket(fresh);
+      }
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 

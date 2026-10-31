@@ -58,22 +58,72 @@ export default function AdminView({ currentUser }) {
   const [adminStatus, setAdminStatus] = useState('resolved');
   const [adminNote, setAdminNote] = useState('');
 
+  // Auto-refresh & Real-time sync states
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // 1. Initial load & Periodic Auto-Refresh Polling (every 5 seconds)
   useEffect(() => {
     loadAll();
+    if (!autoRefreshEnabled) return;
+
+    const intervalId = setInterval(() => {
+      loadAll(true); // Silent background auto-refresh
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [autoRefreshEnabled]);
+
+  // 2. Auto-fetch on browser tab / window focus & visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadAll(true);
+      }
+    };
+
+    const handleFocus = () => {
+      loadAll(true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
-  const loadAll = async () => {
+  // 3. Auto-fetch when admin switches tabs within AdminView
+  useEffect(() => {
+    loadAll(true);
+  }, [activeTab]);
+
+  const loadAll = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
+      setIsRefreshing(true);
       const [statsRes, ticketsRes, usersRes, issueTypesRes] = await Promise.all([
         apiGetAdminStats().catch(() => null),
         apiGetTickets({ limit: 100 }),
-        apiGetAdminUsers(),
-        apiGetIssueTypes(),
+        apiGetAdminUsers().catch(() => null),
+        apiGetIssueTypes().catch(() => null),
       ]);
 
       if (statsRes) setStats(statsRes);
-      if (ticketsRes) setTickets(ticketsRes.items || []);
+      if (ticketsRes) {
+        const freshTickets = ticketsRes.items || [];
+        setTickets(freshTickets);
+
+        // Keep inspecting modal up-to-date if admin is viewing a ticket
+        setSelectedTicket(prev => {
+          if (!prev) return null;
+          const fresh = freshTickets.find(t => t.ticket_id === prev.ticket_id);
+          return fresh || prev;
+        });
+      }
       if (issueTypesRes) setIssueTypes(issueTypesRes.items || []);
 
       if (usersRes && usersRes.items) {
@@ -86,10 +136,12 @@ export default function AdminView({ currentUser }) {
           setAssignCmEmail(cmStaff[0].email_id);
         }
       }
+      setLastRefreshedAt(new Date());
     } catch (err) {
-      console.error(err);
+      console.error('Error during live sync:', err);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -312,16 +364,55 @@ export default function AdminView({ currentUser }) {
 
   return (
     <div className="admin-container">
-      {/* Top Banner */}
+      {/* Top Banner with Real-Time Live Sync Status */}
       <div className="admin-header-banner">
-        <div className="admin-badge-tag">
-          <Shield size={16} />
-          <span>Campus Administration Console</span>
+        <div className="admin-banner-main">
+          <div className="admin-badge-tag">
+            <Shield size={16} />
+            <span>Campus Administration Console</span>
+          </div>
+          <h2>Admin Oversight & Grievance Control</h2>
+          <p className="admin-subtitle">
+            Institution: <b>Team 21 Engineering College</b> · Domain: <b>@team21.com</b> · Team OTP: <b>730792</b>
+          </p>
         </div>
-        <h2>Admin Oversight & Grievance Control</h2>
-        <p className="admin-subtitle">
-          Institution: <b>Team 21 Engineering College</b> · Domain: <b>@team21.com</b> · Team OTP: <b>730792</b>
-        </p>
+
+        {/* Live Auto-Refresh & Background Sync Bar */}
+        <div className="admin-live-sync-bar">
+          <div className="live-status-pill">
+            <span className={`live-pulse-dot ${autoRefreshEnabled ? 'pulse-green' : 'pulse-amber'}`}></span>
+            <div className="live-text-group">
+              <span className="live-primary-label">
+                {autoRefreshEnabled ? 'Live Auto-Sync (5s)' : 'Auto-Sync Paused'}
+              </span>
+              <span className="live-time-label">
+                Updated {lastRefreshedAt ? lastRefreshedAt.toLocaleTimeString() : 'just now'}
+              </span>
+            </div>
+          </div>
+
+          <div className="live-controls-group">
+            <button
+              type="button"
+              className={`btn-sync-toggle ${autoRefreshEnabled ? 'active-on' : 'active-off'}`}
+              onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+              title={autoRefreshEnabled ? 'Pause automatic 5-second polling' : 'Resume automatic live polling'}
+            >
+              {autoRefreshEnabled ? 'Pause' : 'Resume'}
+            </button>
+
+            <button
+              type="button"
+              className="btn-sync-action"
+              onClick={() => loadAll(false)}
+              disabled={isRefreshing}
+              title="Force fetch all complaints & metrics from server now"
+            >
+              <RefreshCw size={14} className={isRefreshing ? 'spin-icon' : ''} />
+              <span>{isRefreshing ? 'Syncing...' : 'Sync Now'}</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Admin Nav Tabs matching Wireframe Page 5 & 6 & 7 */}
