@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { LogIn, Key, Mail, Shield, User, Wrench, Sparkles, AlertCircle } from 'lucide-react';
+import {
+  LogIn, Key, Mail, Shield, Users, Wrench, Sparkles,
+  AlertCircle, GraduationCap, BookOpen, Briefcase
+} from 'lucide-react';
 import { apiLoginUser, apiLoginAdmin } from '../api';
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
-  const [roleTab, setRoleTab] = useState('student'); // student | cm | admin
+  const [mainTab, setMainTab] = useState('non_admin'); // 'non_admin' | 'cm' | 'admin'
+  const [nonAdminSubRole, setNonAdminSubRole] = useState('student'); // 'student' | 'faculty' | 'office_staff'
   const [emailId, setEmailId] = useState('asha@team21.com');
   const [otp, setOtp] = useState('730792');
   const [loading, setLoading] = useState(false);
@@ -11,17 +15,35 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
   if (!isOpen) return null;
 
-  const handleRoleTabChange = (role) => {
-    setRoleTab(role);
+  const handleMainTabChange = (tab) => {
+    setMainTab(tab);
     setErrorMsg('');
-    if (role === 'student') {
-      setEmailId('asha@team21.com');
-    } else if (role === 'cm') {
+    if (tab === 'non_admin') {
+      applySubRoleCredentials(nonAdminSubRole);
+    } else if (tab === 'cm') {
       setEmailId('kumar@team21.com');
-    } else if (role === 'admin') {
+    } else if (tab === 'admin') {
       setEmailId('admin@team21.com');
     }
     setOtp('730792');
+  };
+
+  const applySubRoleCredentials = (subRole) => {
+    setNonAdminSubRole(subRole);
+    if (subRole === 'student') {
+      setEmailId('asha@team21.com');
+    } else if (subRole === 'faculty') {
+      setEmailId('meera@team21.com');
+    } else if (subRole === 'office_staff') {
+      setEmailId('priya@team21.com');
+    }
+    setOtp('730792');
+  };
+
+  const handleSubRoleChange = (subRole) => {
+    setMainTab('non_admin');
+    setErrorMsg('');
+    applySubRoleCredentials(subRole);
   };
 
   const handleSubmit = async (e) => {
@@ -31,18 +53,39 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
     try {
       let res;
-      if (roleTab === 'admin') {
+      let targetRole = mainTab;
+
+      if (mainTab === 'admin') {
         res = await apiLoginAdmin(emailId.trim(), otp.trim());
+        targetRole = 'admin';
       } else {
         res = await apiLoginUser(emailId.trim(), otp.trim());
+        if (mainTab === 'cm') {
+          targetRole = 'cm';
+        } else {
+          // Resolve non-admin subrole
+          if (res.profile?.role === 'faculty') targetRole = 'faculty';
+          else if (res.profile?.role === 'office_staff') targetRole = 'office_staff';
+          else targetRole = 'student';
+        }
       }
-      onLoginSuccess(res.profile, roleTab);
+
+      onLoginSuccess(res.profile, targetRole);
       onClose();
     } catch (err) {
       setErrorMsg(err.message || 'Login failed. Please check credentials.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const getSubmitLabel = () => {
+    if (loading) return 'Authenticating...';
+    if (mainTab === 'admin') return 'Login as Admin';
+    if (mainTab === 'cm') return 'Login as CM (FixIt)';
+    if (nonAdminSubRole === 'faculty') return 'Login as Non-Admin (Faculty)';
+    if (nonAdminSubRole === 'office_staff') return 'Login as Non-Admin (Office Staff)';
+    return 'Login as Non-Admin (Student)';
   };
 
   return (
@@ -53,64 +96,116 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
             <span className="hindi-badge">आवाज</span>
           </div>
           <h2>Portal Login</h2>
-          <p className="auth-modal-sub">Student Grievance Cell & Campus Maintenance</p>
+          <p className="auth-modal-sub">Campus Grievance Cell & Facility Operations</p>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
-        {/* Role Selector Tabs (Matches wireframe Page 1 & 2 buttons: Admin, Student, CM) */}
+        {/* Primary Role Selector Tabs: Non-Admin, CM, Admin */}
         <div className="auth-role-tabs">
           <button
-            className={`auth-tab-btn ${roleTab === 'student' ? 'active' : ''}`}
-            onClick={() => handleRoleTabChange('student')}
+            type="button"
+            className={`auth-tab-btn ${mainTab === 'non_admin' ? 'active' : ''}`}
+            onClick={() => handleMainTabChange('non_admin')}
           >
-            <User size={15} />
-            <span>Student</span>
+            <Users size={15} />
+            <span>Non-Admin</span>
           </button>
 
           <button
-            className={`auth-tab-btn ${roleTab === 'cm' ? 'active' : ''}`}
-            onClick={() => handleRoleTabChange('cm')}
+            type="button"
+            className={`auth-tab-btn ${mainTab === 'cm' ? 'active' : ''}`}
+            onClick={() => handleMainTabChange('cm')}
           >
             <Wrench size={15} />
-            <span>CM (Staff)</span>
+            <span>CM (FixIt)</span>
           </button>
 
           <button
-            className={`auth-tab-btn ${roleTab === 'admin' ? 'active' : ''}`}
-            onClick={() => handleRoleTabChange('admin')}
+            type="button"
+            className={`auth-tab-btn ${mainTab === 'admin' ? 'active' : ''}`}
+            onClick={() => handleMainTabChange('admin')}
           >
             <Shield size={15} />
             <span>Admin</span>
           </button>
         </div>
 
+        {/* Sub-options for Non-Admin: Student, Faculty, Office Staff */}
+        {mainTab === 'non_admin' && (
+          <div className="nonadmin-subtabs-wrapper">
+            <div className="subtabs-caption">Select Non-Admin Category:</div>
+            <div className="nonadmin-subtabs-row">
+              <button
+                type="button"
+                className={`subtab-btn ${nonAdminSubRole === 'student' ? 'active' : ''}`}
+                onClick={() => handleSubRoleChange('student')}
+              >
+                <GraduationCap size={14} />
+                <span>Student</span>
+              </button>
+
+              <button
+                type="button"
+                className={`subtab-btn ${nonAdminSubRole === 'faculty' ? 'active' : ''}`}
+                onClick={() => handleSubRoleChange('faculty')}
+              >
+                <BookOpen size={14} />
+                <span>Faculty</span>
+              </button>
+
+              <button
+                type="button"
+                className={`subtab-btn ${nonAdminSubRole === 'office_staff' ? 'active' : ''}`}
+                onClick={() => handleSubRoleChange('office_staff')}
+              >
+                <Briefcase size={14} />
+                <span>Office Staff</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Quick Demo Credentials Info Banner */}
         <div className="demo-credentials-box">
           <div className="demo-head">
             <Sparkles size={14} color="#f59e0b" />
-            <span>Demo Institution Credentials (Team 21)</span>
+            <span>Quick Demo Institutional Accounts (@team21.com)</span>
           </div>
           <div className="demo-pills-row">
             <button
               type="button"
-              className="quick-demo-pill"
-              onClick={() => { handleRoleTabChange('student'); }}
+              className={`quick-demo-pill ${mainTab === 'non_admin' && nonAdminSubRole === 'student' ? 'active-pill' : ''}`}
+              onClick={() => handleSubRoleChange('student')}
             >
-              Student: asha@team21.com
+              🎓 Student: asha@team21.com
             </button>
             <button
               type="button"
-              className="quick-demo-pill"
-              onClick={() => { handleRoleTabChange('cm'); }}
+              className={`quick-demo-pill ${mainTab === 'non_admin' && nonAdminSubRole === 'faculty' ? 'active-pill' : ''}`}
+              onClick={() => handleSubRoleChange('faculty')}
             >
-              CM: kumar@team21.com
+              👨‍🏫 Faculty: meera@team21.com
             </button>
             <button
               type="button"
-              className="quick-demo-pill"
-              onClick={() => { handleRoleTabChange('admin'); }}
+              className={`quick-demo-pill ${mainTab === 'non_admin' && nonAdminSubRole === 'office_staff' ? 'active-pill' : ''}`}
+              onClick={() => handleSubRoleChange('office_staff')}
             >
-              Admin: admin@team21.com
+              💼 Staff: priya@team21.com
+            </button>
+            <button
+              type="button"
+              className={`quick-demo-pill ${mainTab === 'cm' ? 'active-pill' : ''}`}
+              onClick={() => handleMainTabChange('cm')}
+            >
+              🔧 CM: kumar@team21.com
+            </button>
+            <button
+              type="button"
+              className={`quick-demo-pill ${mainTab === 'admin' ? 'active-pill' : ''}`}
+              onClick={() => handleMainTabChange('admin')}
+            >
+              🛡️ Admin: admin@team21.com
             </button>
           </div>
         </div>
@@ -151,12 +246,12 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
               placeholder="e.g. 730792"
               required
             />
-            <span className="form-hint">Team 21 default OTP is <b>730792</b></span>
+            <span className="form-hint">Team 21 default institutional OTP is <b>730792</b></span>
           </div>
 
           <button type="submit" className="btn btn-primary btn-lg auth-submit-btn" disabled={loading}>
             <LogIn size={18} />
-            <span>{loading ? 'Authenticating...' : `Login as ${roleTab.toUpperCase()}`}</span>
+            <span>{getSubmitLabel()}</span>
           </button>
         </form>
       </div>

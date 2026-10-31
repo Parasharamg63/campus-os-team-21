@@ -82,7 +82,7 @@ exports.createTicket = async (req, res) => {
       timeline: [
         {
           status: 'Registered',
-          note: 'Complaint registered by student',
+          note: `Complaint registered by ${reported_by_role === 'student' ? 'student' : reported_by_role === 'faculty' ? 'faculty' : 'office staff'}`,
           actor_name: reported_by_name,
           actor_role: reported_by_role,
           timestamp: new Date(),
@@ -138,10 +138,10 @@ exports.listTickets = async (req, res) => {
 
     // Role-based visibility
     if (req.user) {
-      const isCM = req.user.role === 'office_staff' || req.user.role === 'admin' || (req.user.dept && req.user.dept.toLowerCase().includes('maintenance'));
+      const isCM = (req.user.role === 'office_staff' && req.user.dept && req.user.dept.toLowerCase().includes('maintenance')) || req.user.role === 'admin';
 
       if (!isCM) {
-        // Students & faculty see only their own tickets
+        // Non-admin users (students, faculty, office staff) see only their own tickets
         query.reported_by = req.user.email_id;
       } else if (mine === 'true') {
         // CM or admin explicitly asked for tickets they raised or assigned to them

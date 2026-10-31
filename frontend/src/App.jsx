@@ -39,6 +39,10 @@ export default function App() {
       setActiveRole('admin');
     } else if (user.role === 'office_staff' && (user.dept || '').toLowerCase().includes('maintenance')) {
       setActiveRole('cm');
+    } else if (user.role === 'faculty') {
+      setActiveRole('faculty');
+    } else if (user.role === 'office_staff') {
+      setActiveRole('office_staff');
     } else {
       setActiveRole('student');
     }
@@ -50,6 +54,14 @@ export default function App() {
         const res = await apiLoginUser('asha@team21.com', '730792');
         setCurrentUserState(res.profile);
         setActiveRole('student');
+      } else if (role === 'faculty') {
+        const res = await apiLoginUser('meera@team21.com', '730792');
+        setCurrentUserState(res.profile);
+        setActiveRole('faculty');
+      } else if (role === 'office_staff') {
+        const res = await apiLoginUser('priya@team21.com', '730792');
+        setCurrentUserState(res.profile);
+        setActiveRole('office_staff');
       } else if (role === 'cm') {
         const res = await apiLoginUser('kumar@team21.com', '730792');
         setCurrentUserState(res.profile);
@@ -93,6 +105,7 @@ export default function App() {
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  const isNonAdmin = ['student', 'faculty', 'office_staff'].includes(activeRole);
 
   return (
     <div className={`app-root ${isMobileView ? 'mode-mobile-frame' : 'mode-desktop'}`}>
@@ -116,9 +129,10 @@ export default function App() {
           role={activeRole}
           onHomeClick={() => {}}
         >
-          {activeRole === 'student' && (
+          {isNonAdmin && (
             <StudentView
               currentUser={currentUser}
+              activeRole={activeRole}
               onOpenNotifications={() => setIsNotifOpen(true)}
               onSelectRole={handleSwitchRole}
             />

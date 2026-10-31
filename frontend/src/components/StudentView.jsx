@@ -65,7 +65,18 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
     loadTickets();
     loadIssueTypes();
     loadFeedbacks();
+    if (currentUser) {
+      setFormData(prev => ({
+        ...prev,
+        name: currentUser.name || (currentUser.role === 'faculty' ? 'Dr. Meera Rao' : currentUser.role === 'office_staff' ? 'Priya Nair' : 'Asha Kumar'),
+        mobile: currentUser.phone_number || '9876543210',
+        dept: currentUser.dept || (currentUser.role === 'office_staff' ? 'Academic Administration' : 'CSE'),
+      }));
+    }
   }, [currentUser]);
+
+  const userRole = currentUser?.role || 'student';
+  const roleNameLabel = userRole === 'faculty' ? 'Faculty' : userRole === 'office_staff' ? 'Office Staff' : 'Student';
 
   const loadTickets = async () => {
     try {
@@ -217,7 +228,7 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
         category: feedbackCategory,
         comment: feedbackComment,
         author_name: currentUser?.name || formData.name,
-        author_email: currentUser?.email_id || 'asha@team21.com',
+        author_email: currentUser?.email_id || (userRole === 'faculty' ? 'meera@team21.com' : userRole === 'office_staff' ? 'priya@team21.com' : 'asha@team21.com'),
       });
       setFeedbackComment('');
       setSuccessMsg('Thank you for your valuable feedback!');
@@ -349,8 +360,9 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
           <span className="banner-hindi-txt">आवाज</span>
         </div>
         <div className="banner-title-content">
-          <h1 className="banner-main-title">Student Grievance Cell</h1>
-          <p className="banner-sub-title">Quick, transparent campus maintenance ticketing & resolution</p>
+          <div className="banner-role-badge">Non-Admin Portal · {roleNameLabel}</div>
+          <h1 className="banner-main-title">{roleNameLabel} Grievance & Maintenance Cell</h1>
+          <p className="banner-sub-title">Quick, transparent campus maintenance ticketing & prompt facility resolution</p>
         </div>
       </div>
 
@@ -405,15 +417,17 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
         </div>
       )}
 
-      {/* TAB 1: STUDENT DASHBOARD (Wireframe Page 2) */}
+      {/* TAB 1: NON-ADMIN DASHBOARD (Wireframe Page 2) */}
       {activeTab === 'dashboard' && (
         <div className="student-dashboard-content">
           <div className="dashboard-welcome-card">
             <div>
-              <span className="welcome-tag">👋 Welcome to Campus Portal</span>
-              <h2>Hello, {currentUser?.name || 'Asha Kumar'}</h2>
+              <span className="welcome-tag">👋 Welcome to Campus Portal · Non-Admin</span>
+              <h2>Hello, {currentUser?.name || (userRole === 'faculty' ? 'Dr. Meera Rao' : userRole === 'office_staff' ? 'Priya Nair' : 'Asha Kumar')}</h2>
               <p className="welcome-desc">
-                {currentUser?.usn ? `USN: ${currentUser.usn} · Dept: ${currentUser.dept || 'CSE'}` : 'Track and manage your campus grievances effortlessly.'}
+                {userRole === 'student' && (currentUser?.usn ? `USN: ${currentUser.usn} · Dept: ${currentUser.dept || 'CSE'}` : 'Student Grievance Cell · Track and manage your campus grievances effortlessly.')}
+                {userRole === 'faculty' && `Faculty Member · Designation: ${currentUser?.designation || 'Professor'} · Dept: ${currentUser?.dept || 'CSE'}`}
+                {userRole === 'office_staff' && `Institutional Staff · Designation: ${currentUser?.designation || 'Office Superintendent'} · Dept: ${currentUser?.dept || 'Academic Administration'}`}
               </p>
             </div>
             <button className="btn btn-primary" onClick={() => setActiveTab('raise')}>
@@ -706,11 +720,11 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
               <form onSubmit={handleRaiseSubmit}>
                 <div className="form-row-2">
                   <div className="form-group">
-                    <label className="form-label">Student Name</label>
+                    <label className="form-label">{roleNameLabel} Name</label>
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Enter Full Name"
+                      placeholder={`Enter ${roleNameLabel} Full Name`}
                       value={formData.name}
                       onChange={e => setFormData({ ...formData, name: e.target.value })}
                       required
@@ -718,7 +732,7 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Mobile Number</label>
+                    <label className="form-label">Contact Mobile Number</label>
                     <input
                       type="tel"
                       className="form-input"
@@ -732,7 +746,7 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
 
                 <div className="form-row-2">
                   <div className="form-group">
-                    <label className="form-label">Department / Branch</label>
+                    <label className="form-label">Department / Branch / Office</label>
                     <select
                       className="form-select"
                       value={formData.dept}
@@ -743,7 +757,12 @@ export default function StudentView({ currentUser, onOpenNotifications, onSelect
                       <option value="ISE">ISE (Information Science)</option>
                       <option value="MECH">Mechanical Engineering</option>
                       <option value="CIVIL">Civil Engineering</option>
+                      <option value="Academic Administration">Academic Administration</option>
+                      <option value="Admissions Office">Admissions Office</option>
+                      <option value="Accounts & Finance">Accounts & Finance</option>
+                      <option value="Library">Library</option>
                       <option value="MBA">MBA</option>
+                      <option value="Campus Premises">Campus Premises / General</option>
                       <option value="OTHER">Other</option>
                     </select>
                   </div>
