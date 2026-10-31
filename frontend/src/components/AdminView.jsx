@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Shield, BarChart3, Users, Wrench, AlertTriangle, CheckCircle2,
   Clock, Trash2, UserPlus, FolderPlus, Search, RefreshCw, Send,
-  ArrowRight, Check, Eye, MapPin, Phone, Mail, Download, Image
+  ArrowRight, Check, Eye, MapPin, Phone, Mail, Download, Image,
+  ClipboardList, Calendar, User as UserIcon, LayoutGrid, List, Copy, ExternalLink, X
 } from 'lucide-react';
 import {
   apiGetTickets, apiGetAdminStats, apiGetAdminUsers, apiCreateAdminUser,
@@ -23,6 +24,16 @@ export default function AdminView({ currentUser }) {
 
   // Selected ticket for modal / view
   const [selectedTicket, setSelectedTicket] = useState(null);
+
+  // All Complaints Directory State
+  const [allSearchQuery, setAllSearchQuery] = useState('');
+  const [allStatusFilter, setAllStatusFilter] = useState('all');
+  const [allCategoryFilter, setAllCategoryFilter] = useState('all');
+  const [allDeptFilter, setAllDeptFilter] = useState('all');
+  const [allSortBy, setAllSortBy] = useState('newest');
+  const [allViewMode, setAllViewMode] = useState('grid'); // 'grid' | 'table'
+  const [copiedId, setCopiedId] = useState('');
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState(null);
 
   // Assign CM state (Wireframe Page 7 top)
   const [assignTicketId, setAssignTicketId] = useState('');
@@ -56,7 +67,7 @@ export default function AdminView({ currentUser }) {
       setLoading(true);
       const [statsRes, ticketsRes, usersRes, issueTypesRes] = await Promise.all([
         apiGetAdminStats().catch(() => null),
-        apiGetTickets(),
+        apiGetTickets({ limit: 100 }),
         apiGetAdminUsers(),
         apiGetIssueTypes(),
       ]);
@@ -212,6 +223,93 @@ export default function AdminView({ currentUser }) {
   const newComplaints = tickets.filter(t => t.status === 'open');
   const existingComplaints = tickets.filter(t => t.status === 'resolved' || t.status === 'acknowledged');
 
+  // Copy track ID helper
+  const handleCopyTrackId = (id) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(''), 2000);
+  };
+
+  // Filtered complaints for All Complaints Directory
+  const filteredAllComplaints = tickets.filter(t => {
+    // Status filter
+    if (allStatusFilter === 'overdue' && !t.overdue) return false;
+    if (allStatusFilter !== 'all' && allStatusFilter !== 'overdue' && t.status !== allStatusFilter) return false;
+
+    // Category filter
+    if (allCategoryFilter !== 'all' && t.issue_type_id !== allCategoryFilter) return false;
+
+    // Department filter
+    if (allDeptFilter !== 'all') {
+      const d = (t.reported_by_dept || '').toLowerCase();
+      if (!d.includes(allDeptFilter.toLowerCase())) return false;
+    }
+
+    // Search query
+    if (allSearchQuery) {
+      const q = allSearchQuery.toLowerCase();
+      const match =
+        t.ticket_id?.toLowerCase().includes(q) ||
+        t.title?.toLowerCase().includes(q) ||
+        t.description?.toLowerCase().includes(q) ||
+        t.location?.toLowerCase().includes(q) ||
+        t.reported_by_name?.toLowerCase().includes(q) ||
+        t.reported_by_dept?.toLowerCase().includes(q) ||
+        t.issue_type_name?.toLowerCase().includes(q) ||
+        t.assigned_to?.name?.toLowerCase().includes(q) ||
+        t.assigned_to?.email_id?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    if (allSortBy === 'newest') return new Date(b.created_at) - new Date(a.created_at);
+    if (allSortBy === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+    if (allSortBy === 'tat') {
+      if (!a.tat?.expected_by) return 1;
+      if (!b.tat?.expected_by) return -1;
+      return new Date(a.tat.expected_by) - new Date(b.tat.expected_by);
+    }
+    return 0;
+  });
+
+  // Export CSV Report
+  const handleExportCSV = () => {
+    if (filteredAllComplaints.length === 0) {
+      alert('No complaints to export.');
+      return;
+    }
+    const headers = [
+      'Ticket ID', 'Status', 'Category', 'Title', 'Location',
+      'Reporter Name', 'Department', 'Phone', 'Filed Date',
+      'TAT Deadline', 'Assigned CM', 'Overdue', 'Description'
+    ];
+    const rows = filteredAllComplaints.map(t => [
+      t.ticket_id,
+      t.status,
+      t.issue_type_name || 'General',
+      `"${(t.title || '').replace(/"/g, '""')}"`,
+      `"${(t.location || '').replace(/"/g, '""')}"`,
+      `"${(t.reported_by_name || '').replace(/"/g, '""')}"`,
+      `"${(t.reported_by_dept || '').replace(/"/g, '""')}"`,
+      t.reported_by_phone_number || '',
+      new Date(t.created_at).toLocaleDateString(),
+      t.tat?.expected_by || 'Not Set',
+      t.assigned_to?.name || 'Unassigned',
+      t.overdue ? 'Yes' : 'No',
+      `"${(t.description || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `campus-complaints-report-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="admin-container">
       {/* Top Banner */}
@@ -234,6 +332,14 @@ export default function AdminView({ currentUser }) {
         >
           <BarChart3 size={16} />
           <span>Dashboard</span>
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'all_cmp' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('all_cmp'); setErrorMsg(''); setSuccessMsg(''); }}
+        >
+          <ClipboardList size={16} />
+          <span>All Complaints ({tickets.length})</span>
         </button>
 
         <button
@@ -295,27 +401,27 @@ export default function AdminView({ currentUser }) {
       {activeTab === 'dashboard' && (
         <div className="admin-dashboard-content">
           <div className="admin-stats-grid">
-            <div className="stat-card" onClick={() => setActiveTab('new_cmp')}>
+            <div className="stat-card" onClick={() => { setActiveTab('all_cmp'); setAllStatusFilter('all'); }}>
               <span className="stat-label">Total Complaints</span>
-              <span className="stat-number highlight-blue">{stats?.totalComplaints || tickets.length || 55}</span>
-              <span className="stat-sub">Across all campus blocks</span>
+              <span className="stat-number highlight-blue">{stats?.totalComplaints || tickets.length || 0}</span>
+              <span className="stat-sub">Across all campus blocks (Click to audit)</span>
             </div>
 
-            <div className="stat-card" onClick={() => setActiveTab('existing_cmp')}>
+            <div className="stat-card" onClick={() => { setActiveTab('all_cmp'); setAllStatusFilter('resolved'); }}>
               <span className="stat-label">Solved Complaints</span>
-              <span className="stat-number highlight-green">{stats?.solvedComplaints || 21}</span>
+              <span className="stat-number highlight-green">{stats?.solvedComplaints || tickets.filter(t => t.status === 'resolved' || t.status === 'acknowledged').length}</span>
               <span className="stat-sub">Resolved and verified</span>
             </div>
 
-            <div className="stat-card" onClick={() => setActiveTab('new_cmp')}>
+            <div className="stat-card" onClick={() => { setActiveTab('all_cmp'); setAllStatusFilter('open'); }}>
               <span className="stat-label">In Progress</span>
-              <span className="stat-number highlight-amber">{stats?.inProgressComplaints || 14}</span>
+              <span className="stat-number highlight-amber">{stats?.inProgressComplaints || newComplaints.length}</span>
               <span className="stat-sub">Active work orders</span>
             </div>
 
-            <div className="stat-card">
+            <div className="stat-card" onClick={() => { setActiveTab('all_cmp'); setAllStatusFilter('overdue'); }}>
               <span className="stat-label">Overdue Alerts</span>
-              <span className="stat-number highlight-red">{stats?.overdueComplaints || 1}</span>
+              <span className="stat-number highlight-red">{stats?.overdueComplaints || tickets.filter(t => t.overdue).length}</span>
               <span className="stat-sub">Exceeded turnaround time</span>
             </div>
           </div>
@@ -341,6 +447,521 @@ export default function AdminView({ currentUser }) {
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB 2: ALL COMPLAINTS DIRECTORY (Campus-wide Oversight & Audit) */}
+      {activeTab === 'all_cmp' && (
+        <div className="admin-all-complaints-content">
+          {/* Header & Audit Controls Card */}
+          <div className="admin-dir-head-card card">
+            <div className="admin-dir-header-flex">
+              <div>
+                <span className="badge badge-accent" style={{ marginBottom: 6, display: 'inline-block' }}>
+                  Institutional Oversight & Audit
+                </span>
+                <h3>Campus-Wide Complaints Directory</h3>
+                <p className="card-sub-p">
+                  Supervisory directory of all complaints across campus blocks, academic departments, and facility stages.
+                </p>
+              </div>
+
+              <div className="admin-dir-actions-group">
+                {/* View Mode Toggle: Grid vs Table */}
+                <div className="view-mode-toggle">
+                  <button
+                    type="button"
+                    className={`mode-btn ${allViewMode === 'grid' ? 'active' : ''}`}
+                    onClick={() => setAllViewMode('grid')}
+                    title="Grid Cards View"
+                  >
+                    <LayoutGrid size={15} />
+                    <span>Cards</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`mode-btn ${allViewMode === 'table' ? 'active' : ''}`}
+                    onClick={() => setAllViewMode('table')}
+                    title="Audit Table View"
+                  >
+                    <List size={15} />
+                    <span>Table</span>
+                  </button>
+                </div>
+
+                {/* Export CSV Report */}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleExportCSV}
+                  title="Download CSV report of all complaints for institutional audit"
+                >
+                  <Download size={14} />
+                  <span>Export CSV</span>
+                </button>
+
+                {/* Refresh */}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={loadAll}
+                  disabled={loading}
+                >
+                  <RefreshCw size={14} className={loading ? 'spin-icon' : ''} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="cm-dir-stats-strip">
+              <div
+                className={`cm-stat-pill ${allStatusFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setAllStatusFilter('all')}
+              >
+                <span className="pill-label">Total Filed</span>
+                <span className="pill-val">{tickets.length}</span>
+              </div>
+              <div
+                className={`cm-stat-pill pill-open ${allStatusFilter === 'open' ? 'active' : ''}`}
+                onClick={() => setAllStatusFilter('open')}
+              >
+                <span className="pill-label">Open / Pending</span>
+                <span className="pill-val">{newComplaints.length}</span>
+              </div>
+              <div
+                className={`cm-stat-pill pill-ack ${allStatusFilter === 'acknowledged' ? 'active' : ''}`}
+                onClick={() => setAllStatusFilter('acknowledged')}
+              >
+                <span className="pill-label">In Progress</span>
+                <span className="pill-val">{tickets.filter(t => t.status === 'acknowledged').length}</span>
+              </div>
+              <div
+                className={`cm-stat-pill pill-resolved ${allStatusFilter === 'resolved' ? 'active' : ''}`}
+                onClick={() => setAllStatusFilter('resolved')}
+              >
+                <span className="pill-label">Fixed & Resolved</span>
+                <span className="pill-val">{tickets.filter(t => t.status === 'resolved').length}</span>
+              </div>
+              {tickets.filter(t => t.overdue).length > 0 && (
+                <div
+                  className={`cm-stat-pill pill-overdue ${allStatusFilter === 'overdue' ? 'active' : ''}`}
+                  onClick={() => setAllStatusFilter('overdue')}
+                >
+                  <span className="pill-label">⚠️ Overdue TAT</span>
+                  <span className="pill-val">{tickets.filter(t => t.overdue).length}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Filter & Search Bar */}
+          <div className="cm-dir-toolbar card">
+            <div className="cm-dir-search-wrap">
+              <Search size={18} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search by Track ID, student name, department, title, room/location, technician..."
+                value={allSearchQuery}
+                onChange={(e) => setAllSearchQuery(e.target.value)}
+                className="dir-search-input"
+              />
+              {allSearchQuery && (
+                <button
+                  type="button"
+                  className="search-clear-btn"
+                  onClick={() => setAllSearchQuery('')}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="cm-dir-filters-row">
+              <div className="filter-group">
+                <label>Status:</label>
+                <select
+                  value={allStatusFilter}
+                  onChange={(e) => setAllStatusFilter(e.target.value)}
+                  className="dir-select"
+                >
+                  <option value="all">All Statuses ({tickets.length})</option>
+                  <option value="open">Open ({newComplaints.length})</option>
+                  <option value="acknowledged">In Progress ({tickets.filter(t => t.status === 'acknowledged').length})</option>
+                  <option value="resolved">Resolved ({tickets.filter(t => t.status === 'resolved').length})</option>
+                  <option value="overdue">⚠️ Overdue ({tickets.filter(t => t.overdue).length})</option>
+                </select>
+              </div>
+
+              <div className="filter-group">
+                <label>Category:</label>
+                <select
+                  value={allCategoryFilter}
+                  onChange={(e) => setAllCategoryFilter(e.target.value)}
+                  className="dir-select"
+                >
+                  <option value="all">All Categories</option>
+                  {issueTypes.map(it => (
+                    <option key={it.id || it.issue_type_id || it._id} value={it.id || it.issue_type_id || it._id}>
+                      {it.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="filter-group">
+                <label>Department:</label>
+                <select
+                  value={allDeptFilter}
+                  onChange={(e) => setAllDeptFilter(e.target.value)}
+                  className="dir-select"
+                >
+                  <option value="all">All Departments</option>
+                  <option value="CSE">CSE</option>
+                  <option value="ECE">ECE</option>
+                  <option value="MECH">MECH</option>
+                  <option value="CIVIL">CIVIL</option>
+                  <option value="EEE">EEE</option>
+                  <option value="Hostel">Hostel</option>
+                </select>
+              </div>
+
+              <div className="filter-group">
+                <label>Sort By:</label>
+                <select
+                  value={allSortBy}
+                  onChange={(e) => setAllSortBy(e.target.value)}
+                  className="dir-select"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="tat">TAT Deadline</option>
+                </select>
+              </div>
+
+              {(allSearchQuery || allStatusFilter !== 'all' || allCategoryFilter !== 'all' || allDeptFilter !== 'all') && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    setAllSearchQuery('');
+                    setAllStatusFilter('all');
+                    setAllCategoryFilter('all');
+                    setAllDeptFilter('all');
+                  }}
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Directory Count Indicator */}
+          <div className="cm-dir-results-info">
+            <span>Showing <b>{filteredAllComplaints.length}</b> of <b>{tickets.length}</b> institutional complaints</span>
+            {filteredAllComplaints.length === 0 && !loading && (
+              <span className="no-match-alert">No complaints match your search or filter criteria.</span>
+            )}
+          </div>
+
+          {/* VIEW MODE 1: GRID CARDS VIEW */}
+          {allViewMode === 'grid' && (
+            <div className="cm-dir-grid">
+              {filteredAllComplaints.map((t) => (
+                <div
+                  key={t.ticket_id}
+                  className={`cm-complaint-card card ${t.overdue ? 'card-overdue' : ''} ${t.status === 'resolved' ? 'card-resolved' : ''}`}
+                >
+                  {/* Card Top Strip */}
+                  <div className="cm-card-top-strip">
+                    <div className="cm-id-row">
+                      <span className="ticket-id-tag">#{t.ticket_id}</span>
+                      <button
+                        type="button"
+                        className="copy-id-btn"
+                        title="Copy Track ID"
+                        onClick={() => handleCopyTrackId(t.ticket_id)}
+                      >
+                        {copiedId === t.ticket_id ? (
+                          <Check size={12} className="text-success" />
+                        ) : (
+                          <Copy size={12} />
+                        )}
+                        <span>{copiedId === t.ticket_id ? 'Copied' : 'Copy'}</span>
+                      </button>
+                      {t.overdue && (
+                        <span className="badge badge-overdue-tag">
+                          <AlertTriangle size={12} /> Overdue
+                        </span>
+                      )}
+                    </div>
+                    <div className="cm-badges-row">
+                      <span className="badge badge-type">
+                        {t.issue_type_name || 'General'}
+                      </span>
+                      <span className={`status-badge status-${t.status}`}>
+                        {t.status === 'open' && 'Open'}
+                        {t.status === 'acknowledged' && 'In Progress'}
+                        {t.status === 'resolved' && 'Resolved'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Title & Desc */}
+                  <h4 className="cm-card-title">{t.title}</h4>
+                  <p className="cm-card-desc">{t.description}</p>
+
+                  {/* Reporter & Location Meta */}
+                  <div className="cm-card-meta-list">
+                    <div className="cm-meta-item">
+                      <UserIcon size={14} className="meta-icon" />
+                      <span><b>{t.reported_by_name}</b> {t.reported_by_dept && `(${t.reported_by_dept})`}</span>
+                    </div>
+                    {t.reported_by_phone_number && (
+                      <div className="cm-meta-item">
+                        <Phone size={14} className="meta-icon" />
+                        <span>{t.reported_by_phone_number}</span>
+                      </div>
+                    )}
+                    <div className="cm-meta-item">
+                      <MapPin size={14} className="meta-icon" />
+                      <span>{t.location}</span>
+                    </div>
+                    <div className="cm-meta-item">
+                      <Clock size={14} className="meta-icon" />
+                      <span>Filed: {new Date(t.created_at).toLocaleString()}</span>
+                    </div>
+                    {t.tat?.expected_by && (
+                      <div className="cm-meta-item tat-highlight">
+                        <Calendar size={14} className="meta-icon" />
+                        <span>TAT: <b>{new Date(t.tat.expected_by).toLocaleDateString()}</b></span>
+                      </div>
+                    )}
+                    {t.assigned_to?.name && (
+                      <div className="cm-meta-item assigned-highlight">
+                        <Wrench size={14} className="meta-icon" />
+                        <span>Technician: <b>{t.assigned_to.name}</b></span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Photos Row with Download capability */}
+                  {(t.photo?.url || t.photo_url || t.resolution_photo?.url || t.proof_of_resolution_url) && (
+                    <div className="cm-card-photos-strip">
+                      {(t.photo?.url || t.photo_url) && (
+                        <div className="photo-thumb-wrap">
+                          <div
+                            className="photo-thumb-inner"
+                            onClick={() => setPreviewPhotoUrl(t.photo?.url || t.photo_url)}
+                            title="Click to view full defect photo"
+                          >
+                            <img src={t.photo?.url || t.photo_url} alt="Defect" className="photo-thumb" />
+                            <span className="photo-label">Defect Photo</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="thumb-download-icon-btn"
+                            title="Download Defect Photo"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadComplaintImage(t.photo?.url || t.photo_url, `${t.ticket_id}-defect.jpg`);
+                            }}
+                          >
+                            <Download size={12} />
+                          </button>
+                        </div>
+                      )}
+                      {(t.resolution_photo?.url || t.proof_of_resolution_url) && (
+                        <div className="photo-thumb-wrap proof-thumb-wrap">
+                          <div
+                            className="photo-thumb-inner"
+                            onClick={() => setPreviewPhotoUrl(t.resolution_photo?.url || t.proof_of_resolution_url)}
+                            title="Click to view resolution proof photo"
+                          >
+                            <img src={t.resolution_photo?.url || t.proof_of_resolution_url} alt="Proof" className="photo-thumb" />
+                            <span className="photo-label proof-label">Proof of Work</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="thumb-download-icon-btn"
+                            title="Download Proof Photo"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadComplaintImage(t.resolution_photo?.url || t.proof_of_resolution_url, `${t.ticket_id}-resolution-proof.jpg`);
+                            }}
+                          >
+                            <Download size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Card Actions */}
+                  <div className="cm-card-actions">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setSelectedTicket(t)}
+                    >
+                      <Eye size={14} />
+                      <span>Inspect & Update</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setAssignTicketId(t.ticket_id);
+                        setActiveTab('assign_cm');
+                      }}
+                    >
+                      <Wrench size={14} />
+                      <span>Assign CM</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm icon-btn"
+                      title="Delete Ticket"
+                      onClick={() => handleDeleteTicket(t.ticket_id)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* VIEW MODE 2: TABLE AUDIT VIEW */}
+          {allViewMode === 'table' && (
+            <div className="admin-table-audit-card card">
+              <div className="table-responsive">
+                <table className="custom-table admin-audit-table">
+                  <thead>
+                    <tr>
+                      <th>Track ID</th>
+                      <th>Category & Title</th>
+                      <th>Reporter</th>
+                      <th>Location</th>
+                      <th>Status</th>
+                      <th>TAT</th>
+                      <th>Assigned CM</th>
+                      <th>Photos</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAllComplaints.map((t) => (
+                      <tr key={t.ticket_id} className={t.overdue ? 'row-overdue' : ''}>
+                        <td className="mono font-bold">
+                          <div className="table-id-flex">
+                            <span>#{t.ticket_id}</span>
+                            <button
+                              type="button"
+                              className="copy-mini-btn"
+                              title="Copy ID"
+                              onClick={() => handleCopyTrackId(t.ticket_id)}
+                            >
+                              {copiedId === t.ticket_id ? <Check size={11} className="text-success" /> : <Copy size={11} />}
+                            </button>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="table-title-cell">
+                            <span className="badge badge-type table-badge">{t.issue_type_name || 'General'}</span>
+                            <span className="table-t-title">{t.title}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="table-rep-cell">
+                            <b>{t.reported_by_name}</b>
+                            <span className="text-muted">{t.reported_by_dept || 'Student'}</span>
+                          </div>
+                        </td>
+                        <td>{t.location}</td>
+                        <td>
+                          <div className="table-status-cell">
+                            <span className={`status-badge status-${t.status}`}>{t.status}</span>
+                            {t.overdue && <span className="badge-overdue-tag">⚠️ Overdue</span>}
+                          </div>
+                        </td>
+                        <td>{t.tat?.expected_by ? new Date(t.tat.expected_by).toLocaleDateString() : '-'}</td>
+                        <td>
+                          {t.assigned_to?.name ? (
+                            <span className="cm-assigned-pill">{t.assigned_to.name}</span>
+                          ) : (
+                            <span className="cm-unassigned-pill">Unassigned</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="table-photos-cell">
+                            {(t.photo?.url || t.photo_url) && (
+                              <button
+                                type="button"
+                                className="table-photo-btn"
+                                title="Download Defect Photo"
+                                onClick={() => downloadComplaintImage(t.photo?.url || t.photo_url, `${t.ticket_id}-defect.jpg`)}
+                              >
+                                <Download size={12} />
+                                <span>Defect</span>
+                              </button>
+                            )}
+                            {(t.resolution_photo?.url || t.proof_of_resolution_url) && (
+                              <button
+                                type="button"
+                                className="table-photo-btn proof-btn"
+                                title="Download Proof Photo"
+                                onClick={() => downloadComplaintImage(t.resolution_photo?.url || t.proof_of_resolution_url, `${t.ticket_id}-resolution-proof.jpg`)}
+                              >
+                                <Download size={12} />
+                                <span>Proof</span>
+                              </button>
+                            )}
+                            {!(t.photo?.url || t.photo_url) && !(t.resolution_photo?.url || t.proof_of_resolution_url) && (
+                              <span className="text-muted">-</span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="table-actions-cell">
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-xs"
+                              onClick={() => setSelectedTicket(t)}
+                              title="Inspect Details"
+                            >
+                              <Eye size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-xs"
+                              onClick={() => {
+                                setAssignTicketId(t.ticket_id);
+                                setActiveTab('assign_cm');
+                              }}
+                              title="Assign CM"
+                            >
+                              <Wrench size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger-outline btn-xs"
+                              onClick={() => handleDeleteTicket(t.ticket_id)}
+                              title="Delete Ticket"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -952,6 +1573,53 @@ export default function AdminView({ currentUser }) {
                   </div>
                 </form>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PHOTO PREVIEW LIGHTBOX MODAL */}
+      {previewPhotoUrl && (
+        <div className="modal-backdrop" onClick={() => setPreviewPhotoUrl(null)}>
+          <div className="lightbox-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="lightbox-header">
+              <h4>Photo Evidence Preview</h4>
+              <button
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setPreviewPhotoUrl(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="lightbox-body">
+              <img src={previewPhotoUrl} alt="Evidence full preview" className="lightbox-full-img" />
+            </div>
+            <div className="lightbox-footer">
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => downloadComplaintImage(previewPhotoUrl, 'complaint-evidence.jpg')}
+              >
+                <Download size={14} />
+                <span>Download Image</span>
+              </button>
+              <a
+                href={previewPhotoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-secondary btn-sm"
+              >
+                <ExternalLink size={14} />
+                <span>Open Original</span>
+              </a>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setPreviewPhotoUrl(null)}
+              >
+                Close Preview
+              </button>
             </div>
           </div>
         </div>

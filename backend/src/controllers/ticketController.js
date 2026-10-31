@@ -112,7 +112,7 @@ exports.createTicket = async (req, res) => {
 // GET /api/v1/fixit/tickets
 exports.listTickets = async (req, res) => {
   try {
-    const { status, issue_type_id, mine, limit = 25, cursor, search } = req.query;
+    const { status, issue_type_id, mine, limit = 100, cursor, search } = req.query;
     const query = {};
 
     if (status === 'overdue') {
