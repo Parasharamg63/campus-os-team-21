@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Megaphone, Smartphone, Monitor, Bell, LogIn, LogOut,
+  Megaphone, Smartphone, Monitor, LogIn, LogOut,
   Shield, Wrench, GraduationCap, Users, ChevronDown, BookOpen, Briefcase, Check
 } from 'lucide-react';
 
@@ -12,8 +12,6 @@ export default function Header({
   onLogout,
   isMobileView,
   setIsMobileView,
-  unreadCount,
-  onOpenNotifications,
 }) {
   const [showNonAdminMenu, setShowNonAdminMenu] = useState(false);
   const dropdownRef = useRef(null);
@@ -173,15 +171,6 @@ export default function Header({
             <span className="view-toggle-text">{isMobileView ? "Desktop View" : "Phone View"}</span>
           </button>
 
-          {/* Notifications Bell */}
-          <button
-            className="notification-btn"
-            onClick={onOpenNotifications}
-            title="Notifications"
-          >
-            <Bell size={18} />
-            {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-          </button>
 
           {/* User Account / Login */}
           {currentUser ? (

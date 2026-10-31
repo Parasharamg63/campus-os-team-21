@@ -5,17 +5,14 @@ import StudentView from './components/StudentView';
 import CMView from './components/CMView';
 import AdminView from './components/AdminView';
 import LoginModal from './components/LoginModal';
-import NotificationsModal from './components/NotificationsModal';
-import { getCurrentUser, setCurrentUser, removeCurrentUser, removeToken, apiGetNotifications, apiLoginUser, apiLoginAdmin } from './api';
+import { getCurrentUser, setCurrentUser, removeCurrentUser, removeToken, apiLoginUser, apiLoginAdmin } from './api';
 import './App.css';
 
 export default function App() {
-  const [activeRole, setActiveRole] = useState('student'); // 'student' | 'cm' | 'admin'
+  const [activeRole, setActiveRole] = useState('student'); // 'student' | 'faculty' | 'office_staff' | 'cm' | 'admin'
   const [currentUser, setCurrentUserState] = useState(getCurrentUser());
   const [isMobileView, setIsMobileView] = useState(false); // Toggle between mobile frame & desktop view
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
 
   // Auto-seed or detect current user
   useEffect(() => {
@@ -26,12 +23,6 @@ export default function App() {
       syncRoleWithUser(currentUser);
     }
   }, []);
-
-  useEffect(() => {
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 15000);
-    return () => clearInterval(interval);
-  }, [currentUser, activeRole]);
 
   const syncRoleWithUser = (user) => {
     if (!user) return;
@@ -76,16 +67,6 @@ export default function App() {
     }
   };
 
-  const loadNotifications = async () => {
-    try {
-      const email = currentUser?.email_id || (activeRole === 'cm' ? 'cm@team21.com' : 'asha@team21.com');
-      const list = await apiGetNotifications(email);
-      setNotifications(list || []);
-    } catch (e) {
-      // non-blocking
-    }
-  };
-
   // Switch role with instant credential switch
   const handleSwitchRole = async (newRole) => {
     setActiveRole(newRole);
@@ -104,7 +85,6 @@ export default function App() {
     setCurrentUserState(null);
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
   const isNonAdmin = ['student', 'faculty', 'office_staff'].includes(activeRole);
 
   return (
@@ -118,8 +98,6 @@ export default function App() {
         onLogout={handleLogout}
         isMobileView={isMobileView}
         setIsMobileView={setIsMobileView}
-        unreadCount={unreadCount}
-        onOpenNotifications={() => setIsNotifOpen(true)}
       />
 
       {/* Main Container wrapped in PhoneFrame (toggleable) */}
@@ -133,7 +111,6 @@ export default function App() {
             <StudentView
               currentUser={currentUser}
               activeRole={activeRole}
-              onOpenNotifications={() => setIsNotifOpen(true)}
               onSelectRole={handleSwitchRole}
             />
           )}
@@ -141,7 +118,6 @@ export default function App() {
           {activeRole === 'cm' && (
             <CMView
               currentUser={currentUser}
-              onOpenNotifications={() => setIsNotifOpen(true)}
             />
           )}
 
@@ -153,18 +129,11 @@ export default function App() {
         </PhoneFrame>
       </main>
 
-      {/* Modals */}
+      {/* Login Modal */}
       <LoginModal
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
         onLoginSuccess={handleLoginSuccess}
-      />
-
-      <NotificationsModal
-        isOpen={isNotifOpen}
-        onClose={() => setIsNotifOpen(false)}
-        notifications={notifications}
-        onRefresh={loadNotifications}
       />
     </div>
   );

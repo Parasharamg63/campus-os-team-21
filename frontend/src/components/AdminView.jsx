@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import {
   Shield, BarChart3, Users, Wrench, AlertTriangle, CheckCircle2,
-  Clock, Trash2, UserPlus, FolderPlus, Search, RefreshCw, Send,
+  Clock, Trash2, FolderPlus, Search, RefreshCw, Send,
   ArrowRight, Check, Eye, MapPin, Phone, Mail, Download, Image,
-  ClipboardList, Calendar, User as UserIcon, LayoutGrid, List, Copy, ExternalLink, X
+  ClipboardList, Calendar, LayoutGrid, List, Copy, ExternalLink, X
 } from 'lucide-react';
 import {
-  apiGetTickets, apiGetAdminStats, apiGetAdminUsers, apiCreateAdminUser,
-  apiDeleteAdminUser, apiGetIssueTypes, apiCreateIssueType, apiDeleteIssueType,
-  apiAssignTicket, apiDeleteTicket, apiUpdateTicketStatus, downloadComplaintImage
+  apiGetTickets, apiGetIssueTypes, apiDeleteTicket, apiUpdateTicketStatus, downloadComplaintImage
 } from '../api';
 
 export default function AdminView({ currentUser }) {
-  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard | new_cmp | existing_cmp | assign_cm | issue_types | users
+  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard | all_cmp | new_cmp | existing_cmp | issue_types
   const [stats, setStats] = useState(null);
   const [tickets, setTickets] = useState([]);
-  const [cmStaffList, setCmStaffList] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
   const [issueTypes, setIssueTypes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -34,25 +30,6 @@ export default function AdminView({ currentUser }) {
   const [allViewMode, setAllViewMode] = useState('grid'); // 'grid' | 'table'
   const [copiedId, setCopiedId] = useState('');
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState(null);
-
-  // Assign CM state (Wireframe Page 7 top)
-  const [assignTicketId, setAssignTicketId] = useState('');
-  const [assignCmEmail, setAssignCmEmail] = useState('');
-
-  // New Issue Type form
-  const [newTypeName, setNewTypeName] = useState('');
-  const [newTypeDesc, setNewTypeDesc] = useState('');
-
-  // New User form
-  const [newUserForm, setNewUserForm] = useState({
-    role: 'student',
-    name: '',
-    email_id: '',
-    phone_number: '',
-    usn: '',
-    dept: 'CSE',
-    designation: '',
-  });
 
   // Admin status update
   const [adminStatus, setAdminStatus] = useState('resolved');
@@ -105,17 +82,26 @@ export default function AdminView({ currentUser }) {
     try {
       if (!isSilent) setLoading(true);
       setIsRefreshing(true);
-      const [statsRes, ticketsRes, usersRes, issueTypesRes] = await Promise.all([
-        apiGetAdminStats().catch(() => null),
+      const [ticketsRes, issueTypesRes] = await Promise.all([
         apiGetTickets({ limit: 100 }),
-        apiGetAdminUsers().catch(() => null),
         apiGetIssueTypes().catch(() => null),
       ]);
 
-      if (statsRes) setStats(statsRes);
       if (ticketsRes) {
         const freshTickets = ticketsRes.items || [];
         setTickets(freshTickets);
+
+        // Derive metrics directly from GET /tickets (Row 2 of spec: CM and admin see all)
+        const total = freshTickets.length;
+        const open = freshTickets.filter(t => t.status === 'open').length;
+        const resolved = freshTickets.filter(t => t.status === 'resolved' || t.status === 'acknowledged').length;
+        const overdue = freshTickets.filter(t => t.overdue).length;
+        setStats({
+          totalComplaints: total,
+          openComplaints: open,
+          resolvedComplaints: resolved,
+          overdueComplaints: overdue,
+        });
 
         // Keep inspecting modal up-to-date if admin is viewing a ticket
         setSelectedTicket(prev => {
@@ -125,116 +111,12 @@ export default function AdminView({ currentUser }) {
         });
       }
       if (issueTypesRes) setIssueTypes(issueTypesRes.items || []);
-
-      if (usersRes && usersRes.items) {
-        setAllUsers(usersRes.items);
-        const cmStaff = usersRes.items.filter(
-          u => u.role === 'office_staff' && (u.dept || '').toLowerCase().includes('maintenance')
-        );
-        setCmStaffList(cmStaff);
-        if (cmStaff.length > 0 && !assignCmEmail) {
-          setAssignCmEmail(cmStaff[0].email_id);
-        }
-      }
       setLastRefreshedAt(new Date());
     } catch (err) {
       console.error('Error during live sync:', err);
     } finally {
       if (!isSilent) setLoading(false);
       setIsRefreshing(false);
-    }
-  };
-
-  // Assign CM (Wireframe Page 7 top)
-  const handleAssignSubmit = async (e) => {
-    e.preventDefault();
-    if (!assignTicketId || !assignCmEmail) {
-      setErrorMsg('Please enter both Complaint ID and select a CM Staff member.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setErrorMsg('');
-      await apiAssignTicket(assignTicketId.trim(), assignCmEmail);
-      setSuccessMsg(`Complaint ${assignTicketId} successfully assigned to ${assignCmEmail}!`);
-      loadAll();
-      setAssignTicketId('');
-    } catch (err) {
-      setErrorMsg(err.message || 'Failed to assign ticket.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Create Issue Type
-  const handleCreateIssueType = async (e) => {
-    e.preventDefault();
-    if (!newTypeName.trim()) return;
-    try {
-      setLoading(true);
-      await apiCreateIssueType({ name: newTypeName, description: newTypeDesc });
-      setNewTypeName('');
-      setNewTypeDesc('');
-      setSuccessMsg('Issue category created successfully!');
-      loadAll();
-    } catch (err) {
-      setErrorMsg(err.message || 'Failed to create category.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Delete Issue Type
-  const handleDeleteIssueType = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this issue category?')) return;
-    try {
-      await apiDeleteIssueType(id);
-      loadAll();
-    } catch (err) {
-      setErrorMsg(err.message);
-    }
-  };
-
-  // Create User
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      setErrorMsg('');
-      const payload = {
-        role: newUserForm.role,
-        name: newUserForm.name,
-        email_id: newUserForm.email_id.toLowerCase().trim(),
-        phone_number: newUserForm.phone_number,
-      };
-
-      if (newUserForm.role === 'student') {
-        payload.usn = newUserForm.usn;
-        payload.dept = newUserForm.dept;
-      } else if (newUserForm.role === 'office_staff') {
-        payload.dept = newUserForm.dept;
-        payload.designation = newUserForm.designation;
-      } else if (newUserForm.role === 'faculty') {
-        payload.designation = newUserForm.designation;
-      }
-
-      await apiCreateAdminUser(payload);
-      setSuccessMsg(`User ${payload.name} created! Default login OTP: 730792`);
-      setNewUserForm({
-        role: 'student',
-        name: '',
-        email_id: '',
-        phone_number: '',
-        usn: '',
-        dept: 'CSE',
-        designation: '',
-      });
-      loadAll();
-    } catch (err) {
-      setErrorMsg(err.message || 'Failed to create user');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -450,27 +332,11 @@ export default function AdminView({ currentUser }) {
         </button>
 
         <button
-          className={`tab-btn ${activeTab === 'assign_cm' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('assign_cm'); setErrorMsg(''); setSuccessMsg(''); }}
-        >
-          <Wrench size={16} />
-          <span>Assign CM</span>
-        </button>
-
-        <button
           className={`tab-btn ${activeTab === 'issue_types' ? 'active' : ''}`}
           onClick={() => { setActiveTab('issue_types'); setErrorMsg(''); setSuccessMsg(''); }}
         >
           <FolderPlus size={16} />
-          <span>Issue Types</span>
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('users'); setErrorMsg(''); setSuccessMsg(''); }}
-        >
-          <Users size={16} />
-          <span>Manage Users</span>
+          <span>Issue Types ({issueTypes.length})</span>
         </button>
       </div>
 
@@ -855,7 +721,7 @@ export default function AdminView({ currentUser }) {
                             title="Download Defect Photo"
                             onClick={(e) => {
                               e.stopPropagation();
-                              downloadComplaintImage(t.photo?.url || t.photo_url, `${t.ticket_id}-defect.jpg`);
+                              downloadComplaintImage(t.ticket_id, `${t.ticket_id}-defect.jpg`, 'defect');
                             }}
                           >
                             <Download size={12} />
@@ -878,7 +744,7 @@ export default function AdminView({ currentUser }) {
                             title="Download Proof Photo"
                             onClick={(e) => {
                               e.stopPropagation();
-                              downloadComplaintImage(t.resolution_photo?.url || t.proof_of_resolution_url, `${t.ticket_id}-resolution-proof.jpg`);
+                              downloadComplaintImage(t.ticket_id, `${t.ticket_id}-resolution-proof.jpg`, 'resolution');
                             }}
                           >
                             <Download size={12} />
@@ -993,7 +859,7 @@ export default function AdminView({ currentUser }) {
                                 type="button"
                                 className="table-photo-btn"
                                 title="Download Defect Photo"
-                                onClick={() => downloadComplaintImage(t.photo?.url || t.photo_url, `${t.ticket_id}-defect.jpg`)}
+                                onClick={() => downloadComplaintImage(t.ticket_id, `${t.ticket_id}-defect.jpg`, 'defect')}
                               >
                                 <Download size={12} />
                                 <span>Defect</span>
@@ -1004,7 +870,7 @@ export default function AdminView({ currentUser }) {
                                 type="button"
                                 className="table-photo-btn proof-btn"
                                 title="Download Proof Photo"
-                                onClick={() => downloadComplaintImage(t.resolution_photo?.url || t.proof_of_resolution_url, `${t.ticket_id}-resolution-proof.jpg`)}
+                                onClick={() => downloadComplaintImage(t.ticket_id, `${t.ticket_id}-resolution-proof.jpg`, 'resolution')}
                               >
                                 <Download size={12} />
                                 <span>Proof</span>
@@ -1106,7 +972,7 @@ export default function AdminView({ currentUser }) {
                             title="Download Defect Photo"
                             onClick={(e) => {
                               e.stopPropagation();
-                              downloadComplaintImage(t.photo?.url || t.photo_url, `${t.ticket_id}-defect.jpg`);
+                              downloadComplaintImage(t.ticket_id, `${t.ticket_id}-defect.jpg`, 'defect');
                             }}
                           >
                             <Download size={12} />
@@ -1123,7 +989,7 @@ export default function AdminView({ currentUser }) {
                             title="Download Resolution Proof Photo"
                             onClick={(e) => {
                               e.stopPropagation();
-                              downloadComplaintImage(t.resolution_photo?.url || t.proof_of_resolution_url, `${t.ticket_id}-resolution-proof.jpg`);
+                              downloadComplaintImage(t.ticket_id, `${t.ticket_id}-resolution-proof.jpg`, 'resolution');
                             }}
                           >
                             <Download size={12} />
@@ -1199,7 +1065,7 @@ export default function AdminView({ currentUser }) {
                             title="Download Defect Photo"
                             onClick={(e) => {
                               e.stopPropagation();
-                              downloadComplaintImage(t.photo?.url || t.photo_url, `${t.ticket_id}-defect.jpg`);
+                              downloadComplaintImage(t.ticket_id, `${t.ticket_id}-defect.jpg`, 'defect');
                             }}
                           >
                             <Download size={12} />
@@ -1216,7 +1082,7 @@ export default function AdminView({ currentUser }) {
                             title="Download Resolution Proof Photo"
                             onClick={(e) => {
                               e.stopPropagation();
-                              downloadComplaintImage(t.resolution_photo?.url || t.proof_of_resolution_url, `${t.ticket_id}-resolution-proof.jpg`);
+                              downloadComplaintImage(t.ticket_id, `${t.ticket_id}-resolution-proof.jpg`, 'resolution');
                             }}
                           >
                             <Download size={12} />
@@ -1237,119 +1103,21 @@ export default function AdminView({ currentUser }) {
         </div>
       )}
 
-      {/* TAB 4: ASSIGN CM (Wireframe Page 7 top) */}
-      {activeTab === 'assign_cm' && (
-        <div className="assign-cm-wrapper">
-          <div className="assign-form-card card">
-            <div className="assign-head">
-              <Wrench size={22} className="assign-lead-icon" />
-              <div>
-                <h2>Assign Complaint to Campus Maintenance</h2>
-                <p>Dispatch a work order to an on-duty technician or supervisor</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleAssignSubmit}>
-              <div className="form-group">
-                <label className="form-label">Select or Enter Complaint ID</label>
-                <div className="quick-select-wrap">
-                  <input
-                    type="text"
-                    className="form-input mono"
-                    placeholder="Enter Track ID e.g. TKT-82067274-46FA"
-                    value={assignTicketId}
-                    onChange={e => setAssignTicketId(e.target.value)}
-                    required
-                  />
-                  <select
-                    className="form-select"
-                    style={{ marginTop: 8 }}
-                    value={assignTicketId}
-                    onChange={e => setAssignTicketId(e.target.value)}
-                  >
-                    <option value="">-- Or choose from open tickets --</option>
-                    {newComplaints.map(t => (
-                      <option key={t.ticket_id} value={t.ticket_id}>
-                        {t.ticket_id} - {t.title} ({t.location})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Campus Maintenance (CM) Staff Member</label>
-                <select
-                  className="form-select"
-                  value={assignCmEmail}
-                  onChange={e => setAssignCmEmail(e.target.value)}
-                  required
-                >
-                  {cmStaffList.map(cm => (
-                    <option key={cm.email_id} value={cm.email_id}>
-                      {cm.name} ({cm.designation || 'Staff'}) - {cm.email_id}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button type="submit" className="btn btn-primary btn-lg" disabled={loading}>
-                <Check size={18} />
-                <span>Assign Task</span>
-              </button>
-            </form>
-          </div>
-
-          <div className="cm-roster-card card">
-            <h3>Registered Maintenance Personnel ({cmStaffList.length})</h3>
-            <div className="roster-list">
-              {cmStaffList.map(cm => (
-                <div key={cm.email_id} className="roster-item">
-                  <div className="roster-avatar">{cm.name[0]}</div>
-                  <div className="roster-info">
-                    <span className="roster-name">{cm.name}</span>
-                    <span className="roster-desig">{cm.designation} · {cm.dept}</span>
-                    <span className="roster-contact"><Mail size={12} /> {cm.email_id} · <Phone size={12} /> {cm.phone_number}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 5: ISSUE TYPES */}
+      {/* TAB 4: ISSUE TYPES DIRECTORY (GET /api/v1/fixit/issue-types) */}
       {activeTab === 'issue_types' && (
         <div className="issue-types-wrapper">
-          <div className="new-type-card card">
-            <h3>Add New Maintenance Category (Issue Type)</h3>
-            <p className="card-sub">Campus Maintenance categories populate the student dropdown dynamically</p>
-
-            <form onSubmit={handleCreateIssueType} className="inline-type-form">
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Category Name e.g. HVAC, Laboratory Gas, Sports Ground"
-                value={newTypeName}
-                onChange={e => setNewTypeName(e.target.value)}
-                required
-              />
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Description of common equipment"
-                value={newTypeDesc}
-                onChange={e => setNewTypeDesc(e.target.value)}
-              />
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                <FolderPlus size={16} />
-                <span>Add Type</span>
-              </button>
-            </form>
-          </div>
-
           <div className="types-table-card card">
-            <h3>Active Issue Types ({issueTypes.length})</h3>
+            <div className="section-head-row" style={{ marginBottom: 14 }}>
+              <div>
+                <h3>Active Maintenance Categories ({issueTypes.length})</h3>
+                <p className="card-sub">Official campus categories fetched via GET /api/v1/fixit/issue-types</p>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={loadAll}>
+                <RefreshCw size={14} className={isRefreshing ? 'spin-icon' : ''} />
+                <span>Refresh Categories</span>
+              </button>
+            </div>
+
             <div className="types-list">
               {issueTypes.map(it => (
                 <div key={it.issue_type_id} className="type-row-item">
@@ -1358,202 +1126,10 @@ export default function AdminView({ currentUser }) {
                       <span className="type-name-txt">{it.name}</span>
                       <span className="mono type-id-small">{it.issue_type_id}</span>
                     </div>
-                    <p className="type-desc-p">{it.description}</p>
+                    <p className="type-desc-p">{it.description || 'General maintenance category for campus premises.'}</p>
                   </div>
-                  <button
-                    className="delete-icon-btn"
-                    onClick={() => handleDeleteIssueType(it.issue_type_id)}
-                    title="Delete Category"
-                  >
-                    <Trash2 size={16} />
-                  </button>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 6: USER MANAGEMENT */}
-      {activeTab === 'users' && (
-        <div className="user-mgmt-wrapper">
-          <div className="new-user-card card">
-            <h3>Create Campus User (Admin Only)</h3>
-            <p className="card-sub">Register students, faculty, or office staff (Campus Maintenance)</p>
-
-            <form onSubmit={handleCreateUser}>
-              <div className="form-row-3">
-                <div className="form-group">
-                  <label className="form-label">Role</label>
-                  <select
-                    className="form-select"
-                    value={newUserForm.role}
-                    onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value })}
-                  >
-                    <option value="student">Student</option>
-                    <option value="office_staff">Office Staff (Maintenance)</option>
-                    <option value="faculty">Faculty</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Full Name</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="e.g. Ramesh Sharma"
-                    value={newUserForm.name}
-                    onChange={e => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Email (@team21.com)</label>
-                  <input
-                    type="email"
-                    className="form-input"
-                    placeholder="e.g. ramesh@team21.com"
-                    value={newUserForm.email_id}
-                    onChange={e => setNewUserForm({ ...newUserForm, email_id: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-row-3">
-                <div className="form-group">
-                  <label className="form-label">Phone Number (10 digits)</label>
-                  <input
-                    type="tel"
-                    className="form-input"
-                    placeholder="e.g. 9876543216"
-                    value={newUserForm.phone_number}
-                    onChange={e => setNewUserForm({ ...newUserForm, phone_number: e.target.value })}
-                    required
-                  />
-                </div>
-
-                {newUserForm.role === 'student' && (
-                  <>
-                    <div className="form-group">
-                      <label className="form-label">USN (Uppercase)</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="e.g. 1CF24CS099"
-                        value={newUserForm.usn}
-                        onChange={e => setNewUserForm({ ...newUserForm, usn: e.target.value })}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Dept</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="e.g. CSE"
-                        value={newUserForm.dept}
-                        onChange={e => setNewUserForm({ ...newUserForm, dept: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </>
-                )}
-
-                {newUserForm.role === 'office_staff' && (
-                  <>
-                    <div className="form-group">
-                      <label className="form-label">Dept</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Campus Maintenance"
-                        value={newUserForm.dept}
-                        onChange={e => setNewUserForm({ ...newUserForm, dept: e.target.value })}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Designation</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="e.g. Plumber / Electrician / Supervisor"
-                        value={newUserForm.designation}
-                        onChange={e => setNewUserForm({ ...newUserForm, designation: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </>
-                )}
-
-                {newUserForm.role === 'faculty' && (
-                  <div className="form-group">
-                    <label className="form-label">Designation</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="e.g. Professor / Asst. Professor"
-                      value={newUserForm.designation}
-                      onChange={e => setNewUserForm({ ...newUserForm, designation: e.target.value })}
-                      required
-                    />
-                  </div>
-                )}
-              </div>
-
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                <UserPlus size={16} />
-                <span>Create User</span>
-              </button>
-            </form>
-          </div>
-
-          <div className="user-list-card card">
-            <h3>Registered Institutional Users ({allUsers.length})</h3>
-            <div className="users-table-scroll">
-              <table className="custom-table">
-                <thead>
-                  <tr>
-                    <th>Role</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Dept / Designation / USN</th>
-                    <th>Team OTP</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allUsers.map(u => (
-                    <tr key={u.email_id}>
-                      <td>
-                        <span className={`badge badge-${u.role}`}>{u.role}</span>
-                      </td>
-                      <td><b>{u.name}</b></td>
-                      <td className="mono">{u.email_id}</td>
-                      <td>{u.dept || u.designation || u.usn || '-'}</td>
-                      <td className="mono highlight-otp">{u.otp || '730792'}</td>
-                      <td>
-                        {u.role !== 'admin' && (
-                          <button
-                            className="delete-icon-btn"
-                            onClick={() => {
-                              if (window.confirm(`Delete user ${u.name}?`)) {
-                                apiDeleteAdminUser(u.email_id).then(() => loadAll());
-                              }
-                            }}
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         </div>
@@ -1592,7 +1168,7 @@ export default function AdminView({ currentUser }) {
                         <button
                           type="button"
                           className="btn btn-secondary btn-xs download-photo-btn"
-                          onClick={() => downloadComplaintImage(selectedTicket.photo?.url || selectedTicket.photo_url, `${selectedTicket.ticket_id}-defect.jpg`)}
+                          onClick={() => downloadComplaintImage(selectedTicket.ticket_id, `${selectedTicket.ticket_id}-defect.jpg`, 'defect')}
                           title="Download Defect Photo"
                         >
                           <Download size={13} />
@@ -1610,7 +1186,7 @@ export default function AdminView({ currentUser }) {
                         <button
                           type="button"
                           className="btn btn-secondary btn-xs download-photo-btn"
-                          onClick={() => downloadComplaintImage(selectedTicket.resolution_photo?.url || selectedTicket.proof_of_resolution_url, `${selectedTicket.ticket_id}-resolution-proof.jpg`)}
+                          onClick={() => downloadComplaintImage(selectedTicket.ticket_id, `${selectedTicket.ticket_id}-resolution-proof.jpg`, 'resolution')}
                           title="Download Resolution Proof Photo"
                         >
                           <Download size={13} />

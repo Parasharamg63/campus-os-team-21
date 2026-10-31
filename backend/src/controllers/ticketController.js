@@ -327,16 +327,10 @@ exports.getTicketPhoto = async (req, res) => {
     const ext = path.extname(filename) || '.jpg';
     const downloadName = `${ticket.ticket_id}-${type === 'resolution' ? 'resolution-proof' : 'defect'}${ext}`;
 
-    if (download === 'true' || download === '1') {
-      if (fs.existsSync(filePath)) {
-        return res.download(filePath, downloadName);
-      }
-      return res.redirect(targetPhoto.url);
-    }
-
     if (fs.existsSync(filePath)) {
-      return res.sendFile(filePath);
+      return res.download(filePath, downloadName);
     } else {
+      res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
       return res.redirect(targetPhoto.url);
     }
   } catch (error) {
